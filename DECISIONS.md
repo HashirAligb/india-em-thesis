@@ -67,6 +67,30 @@ Tracks key analytical and methodological choices made during the research proces
 
 ---
 
+### [2026-06-17] Risk-Adjusted Metric Added to Verdict
+**Decision**: The verdict will use a risk-adjusted measure (annualised return ÷ annualised volatility, a Sharpe-style ratio with 0% risk-free rate) alongside cumulative return, not cumulative return alone.
+**Rationale**: The thesis statement tests "risk-adjusted USD returns," but the original verdict logic only checked which ETF ended highest. Volatility and max drawdown were computed and charted but not fed into the verdict — they sat beside the decision rather than inside it. Adding return ÷ volatility makes the verdict actually reflect the risk dimension the thesis claims to measure: India ending highest is not the same as India being the best deal once the volatility of the ride is accounted for.
+**Alternatives considered**: Cumulative return only; rejected because it fails to operationalise the risk-adjusted language in the thesis statement. Full Sharpe ratio with a non-zero risk-free rate; rejected in favour of a 0% floor for simplicity and cross-window comparability.
+**Source**: Surfaced during a red-team review of my methodology, June 17.
+
+---
+
+### [2026-06-17] Verdict Split into Historical and Forward-Looking Layers
+**Decision**: Structure the verdict in two layers. Layer 1 (historical): did INDA outperform EEM and FXI on returns and risk-adjusted terms from 2013–present? Layer 2 (forward-looking): does today's valuation leave room for the thesis to hold going forward?
+**Rationale**: Returns are measured over 2013–present (past); the valuation premium is a current figure (present); the thesis title concerns the next decade (future). Collapsing these into a single verdict would let past performance masquerade as proof of a future claim. Separating them keeps the analysis honest: return data can prove a historical result; valuation and the 2026 macro picture are forward-looking context, not conclusions the return data supports. Likely final verdict shape: "historically supported, forward-looking uncertain."
+**Alternatives considered**: A single unified verdict; rejected because it conflates what the data proved with what it merely suggests about the future.
+**Source**: Surfaced during a red-team review of my methodology, June 17.
+
+---
+
+### [2026-06-17] 2026 Oil Shock Treated as Stress-Test, Not Core Story
+**Decision**: Treat the 2026 oil shock as a separate stress-test section, not as a driver of the core 2013–present verdict.
+**Rationale**: The shock (crude above $100/bbl from Middle East conflict; India imports ~85% of its crude; ~10% YTD equity decline, $20B+ in foreign outflows) is real and verified, but it represents a single current-year regime. Letting one recent event dominate a 13-year analysis would distort the long-run picture. It belongs as forward-looking caution in Layer 2 and as a discrete stress-test scenario; the main analytical window tests whether India's return premium survived multiple historical regimes.
+**Alternatives considered**: Incorporating the oil shock into the primary return window; rejected because it would give a single current event disproportionate weight in a long-horizon comparison.
+**Source**: Surfaced during a red-team review of my methodology, June 17.
+
+---
+
 ## Data Decisions
 
 ### [2026-06-10] Historical Window
@@ -92,6 +116,13 @@ Tracks key analytical and methodological choices made during the research proces
 **Decision**: The primary dependent variable is India's USD total return performance relative to EM (EEM) and China (FXI/MCHI), not absolute return in isolation.
 **Rationale**: This directly operationalizes the thesis question "is India the best EM bet" and anchors the analysis in relative performance.
 **Alternatives considered**: Absolute India USD returns; rejected because it fails to test the comparative narrative core to the thesis.
+
+---
+
+### [2026-06-17] Price Series: Adjusted vs. Raw Close
+**Decision**: Use dividend-adjusted prices (`auto_adjust=True` in yfinance) for all return calculations across INDA, EEM, and FXI/MCHI.
+**Rationale**: ETFs pay dividends, which cause the raw close price to drop on the ex-dividend date even though no value is lost to the holder — the cash was distributed. Measuring returns off raw close prices would undercount total return and, because INDA, EEM, and FXI pay different dividend amounts, would distort the cross-ETF comparison in unpredictable ways.
+**Alternatives considered**: Using raw close prices; rejected because it systematically understates total return and introduces a dividend-yield bias across ETFs with different payout levels.
 
 ---
 
