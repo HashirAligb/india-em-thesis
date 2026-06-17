@@ -53,6 +53,20 @@ Tracks key analytical and methodological choices made during the research proces
 
 ---
 
+### [2026-06-17] Valuation Premium Assumption Corrected
+**Decision**: Report both trailing P/E and forward P/E premiums rather than relying on the original 20–30% premium assumption stated in the thesis.
+**Rationale**: Live data (Yahoo Finance / iShares fund pages, June 2026) shows the two measures diverge significantly: trailing P/E implies only a ~7.5% premium (India ~21x vs. EM ~20x), while forward P/E implies a ~55–70% premium. Selecting whichever figure flatters the skeptical thesis would be analytically dishonest. The compressed trailing premium is at least partly a distortion from a temporary 2026 oil shock — Middle East conflict pushed crude above $100/bbl; India imports ~85% of its crude, driving a ~10% YTD equity decline and $20B+ in foreign outflows. This may not reflect a structural re-rating.
+**Alternatives considered**: Anchoring to trailing P/E only (understates the premium); anchoring to forward P/E only (overstates it given current earnings disruption). Both rejected as cherry-picking.
+
+---
+
+### [2026-06-17] Commitment to Follow the Data
+**Decision**: The final verdict will follow wherever the returns and valuation data point, even if that means partially disproving the original skeptical hypothesis.
+**Rationale**: Verification work showed India may be less overpriced than initially assumed, and its current market weakness appears temporary rather than structural. Forcing the conclusion to match the starting thesis would undermine the analysis. Adam confirmed that disproving your own thesis is a valid and intellectually credible outcome.
+**Alternatives considered**: Maintaining a fixed skeptical framing throughout; rejected because it risks confirmation bias in data selection and interpretation.
+
+---
+
 ## Data Decisions
 
 ### [2026-06-10] Historical Window
