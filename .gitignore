@@ -42,7 +42,7 @@ data/raw/
 data/processed/
 
 # Outputs — figures and reports are reproducible from source
-outputs/figures/
+#outputs/figures/
 outputs/reports/
 
 # OS
