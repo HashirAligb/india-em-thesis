@@ -315,9 +315,9 @@ than broad EM (EEM) and China (FXI) over 2013–present.
 
 The historical return window cannot prove the *next* decade thesis. Three forward-looking signals add caution:
 
-1. **Valuation ambiguity:** Trailing P/E shows only a ~7.5% India premium over EEM (India ~21x, EM ~20x), while forward P/E implies a ~55–70% premium. The two measures disagree significantly; neither can be dismissed.
+1. **Valuation ambiguity:** India's trailing P/E (~21–22) sits above broad EM, but EM's figure ranges from ~13 to ~19 depending on the data provider, because ETF P/E is calculated differently across sources. The implied premium is therefore a band of roughly 15–40%, not a single figure. Valuation is treated as directional context, not a precise input to the verdict.
 2. **Currency risk:** The rupee (INR) has depreciated against the USD over the full window. USD-denominated investors bear this cost; it is visible directly in the INR=X series, which rose from ~55 to ~95 rupees per dollar over the window.
-3. **2026 oil shock:** Crude above $100/bbl (Middle East conflict) hit India hard — ~10% YTD drawdown, $20B+ in foreign outflows. India imports ~85% of its crude. This is a known structural vulnerability, treated here as a stress-test scenario rather than a permanent re-rating.
+3. **2026 oil shock:** Crude above $100/bbl (Middle East conflict) hit India hard — ~10% YTD drawdown, record foreign outflows. India imports ~85% of its crude. This is a known structural vulnerability, treated here as a stress-test scenario rather than a permanent re-rating.
 
 Likely forward verdict: **historically supported, forward-looking uncertain.**
 
