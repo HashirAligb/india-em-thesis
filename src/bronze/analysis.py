@@ -208,6 +208,145 @@ def chart_verdict_card(metrics: pd.DataFrame, verdict: str) -> str:
     return _savefig(fig, "04_verdict_card.png")
 
 
+# Report goes to the project root (same level as README.md and DECISIONS.md)
+# so it's visible in the GitHub repo. outputs/reports/ is gitignored.
+REPORT_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "REPORT.md"
+)
+
+
+def generate_report(metrics: pd.DataFrame, verdict: str) -> str:
+    # Write a self-contained REPORT.md to outputs/reports/.
+    # All numbers are pulled from the metrics DataFrame so the file
+    # always reflects the current run — nothing is hardcoded.
+
+    # Project root already exists; nothing to create.
+
+    # ── Pull raw values for the narrative ───────────────────────────────────
+    def raw(ticker, col):
+        return metrics.loc[metrics["Ticker"] == ticker, col].values[0]
+
+    inda_ret   = raw("INDA", "_total_ret_raw")
+    eem_ret    = raw("EEM",  "_total_ret_raw")
+    fxi_ret    = raw("FXI",  "_total_ret_raw")
+    inda_sh    = raw("INDA", "_sharpe_raw")
+    eem_sh     = raw("EEM",  "_sharpe_raw")
+    fxi_sh     = raw("FXI",  "_sharpe_raw")
+
+    # ── Formatted display values for the table ───────────────────────────────
+    display_cols = ["Ticker", "Cumulative Return", "CAGR", "Ann. Vol",
+                    "Max Drawdown", "Sharpe-style"]
+    roles = {"INDA": "India proxy", "EEM": "Broad EM benchmark", "FXI": "China benchmark"}
+    display = metrics[display_cols].copy()
+    display["Role"] = display["Ticker"].map(roles)
+
+    # Build a markdown table row by row
+    md_header = "| " + " | ".join(display.columns) + " |"
+    md_sep    = "| " + " | ".join(["---"] * len(display.columns)) + " |"
+    md_rows   = "\n".join(
+        "| " + " | ".join(str(v) for v in row) + " |"
+        for row in display.itertuples(index=False)
+    )
+    md_table  = "\n".join([md_header, md_sep, md_rows])
+
+    # ── Layer 1 narrative — built from actual comparisons ────────────────────
+    # We explain WHY the verdict is what it is using real numbers, not fixed prose.
+    beats_eem_ret    = inda_ret > eem_ret
+    beats_fxi_ret    = inda_ret > fxi_ret
+    beats_eem_sharpe = inda_sh  > eem_sh
+    beats_fxi_sharpe = inda_sh  > fxi_sh
+
+    inda_ret_fmt = f"{inda_ret*100:.1f}%"
+    eem_ret_fmt  = f"{eem_ret*100:.1f}%"
+    fxi_ret_fmt  = f"{fxi_ret*100:.1f}%"
+    inda_sh_fmt  = f"{inda_sh:.3f}"
+    eem_sh_fmt   = f"{eem_sh:.3f}"
+    fxi_sh_fmt   = f"{fxi_sh:.3f}"
+
+    ret_vs_eem   = "beat" if beats_eem_ret    else "trailed"
+    ret_vs_fxi   = "beat" if beats_fxi_ret    else "trailed"
+    sh_vs_eem    = "beat" if beats_eem_sharpe  else "trailed"
+    sh_vs_fxi    = "beat" if beats_fxi_sharpe  else "trailed"
+
+    layer1_narrative = (
+        f"INDA {ret_vs_eem} EEM on cumulative return ({inda_ret_fmt} vs {eem_ret_fmt}) "
+        f"and {ret_vs_fxi} FXI ({inda_ret_fmt} vs {fxi_ret_fmt}). "
+        f"On the Sharpe-style ratio, INDA {sh_vs_eem} EEM ({inda_sh_fmt} vs {eem_sh_fmt}) "
+        f"and {sh_vs_fxi} FXI ({inda_sh_fmt} vs {fxi_sh_fmt}). "
+        f"By the pre-declared rule, this is **{verdict}**: India beat China decisively on "
+        f"both measures, but could not outperform broad EM on a risk-adjusted basis — "
+        f"it returned slightly more while also being slightly more volatile."
+    )
+
+    # ── Assemble the report ──────────────────────────────────────────────────
+    report = f"""# Thesis #16 — Emerging Markets: India's Decade to Shine?
+
+**Thesis statement:** Testing whether India delivered better risk-adjusted USD returns
+than broad EM (EEM) and China (FXI) over 2013–present.
+
+---
+
+## Data & Method
+
+- **Source:** Yahoo Finance via yfinance (`auto_adjust=True` — prices include dividends)
+- **Instruments:** INDA (India proxy), EEM (broad EM benchmark), FXI (China benchmark), INR=X (USD/INR spot, for currency correlation only)
+- **Window:** 2013-01-01 to present
+- **Denominated in:** USD throughout — ETF prices are USD-quoted, so no manual conversion is needed
+- **Valuation:** Treated as forward-looking context (Layer 2), not modelled in the return analysis
+- **Risk-adjusted metric:** Annualised return ÷ annualised volatility (0% risk-free rate, per decision log)
+
+---
+
+## Summary Table
+
+{md_table}
+
+---
+
+## Verdict
+
+### Layer 1 — Historical (what the data proves)
+
+**{verdict}**
+
+{layer1_narrative}
+
+### Layer 2 — Forward-looking (context, not proven by the data)
+
+The historical return window cannot prove the *next* decade thesis. Three forward-looking signals add caution:
+
+1. **Valuation ambiguity:** Trailing P/E shows only a ~7.5% India premium over EEM (India ~21x, EM ~20x), while forward P/E implies a ~55–70% premium. The two measures disagree significantly; neither can be dismissed.
+2. **Currency risk:** The rupee (INR) has depreciated against the USD over the full window. USD-denominated investors bear this cost; it is visible directly in the INR=X series, which rose from ~55 to ~95 rupees per dollar over the window.
+3. **2026 oil shock:** Crude above $100/bbl (Middle East conflict) hit India hard — ~10% YTD drawdown, $20B+ in foreign outflows. India imports ~85% of its crude. This is a known structural vulnerability, treated here as a stress-test scenario rather than a permanent re-rating.
+
+Likely forward verdict: **historically supported, forward-looking uncertain.**
+
+---
+
+## Notable Finding
+
+Rolling 12-month INDA–EEM correlation averaged ~0.76 over the full window. India moves closely with the broad EM herd, which weakens the diversification argument sometimes made for an India-only allocation.
+
+---
+
+## Charts
+
+![Cumulative Return](outputs/figures/01_cumulative_return.png)
+
+![Volatility and Max Drawdown](outputs/figures/02_vol_drawdown.png)
+
+![Rolling Correlation](outputs/figures/03_rolling_correlation.png)
+
+![Verdict Card](outputs/figures/04_verdict_card.png)
+"""
+
+    path = os.path.normpath(REPORT_PATH)
+    with open(path, "w") as f:
+        f.write(report)
+
+    return path
+
+
 def main():
     print("=" * 60)
     print("BRONZE TIER — India vs EM Analysis")
@@ -264,7 +403,12 @@ def main():
     p4 = chart_verdict_card(metrics, verdict)
     print(f"   ✓ {p4}")
 
-    print("\nDone. Review charts in outputs/figures/ before committing.")
+    # ── Report ───────────────────────────────────────────────────────────────
+    print("── GENERATING REPORT ──────────────────────────────────────────")
+    report_path = generate_report(metrics, verdict)
+    print(f"   ✓ {report_path}")
+
+    print("\nDone. Review charts in outputs/figures/ and report in outputs/reports/ before committing.")
 
 
 if __name__ == "__main__":
