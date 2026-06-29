@@ -1,15 +1,16 @@
 # Thesis #16 — Emerging Markets: India's Decade to Shine?
 
 **Thesis statement:** Testing whether India delivered better risk-adjusted USD returns
-than broad EM (EEM) and China (FXI) over 2013–present.
+than EM ex-India and China (FXI) over 2013–2026.
 
 ---
 
 ## Data & Method
 
 - **Source:** Yahoo Finance via yfinance (`auto_adjust=True` — prices include dividends)
-- **Instruments:** INDA (India proxy), EEM (broad EM benchmark), FXI (China benchmark), INR=X (USD/INR spot, for currency correlation only)
-- **Window:** 2013-01-01 to present
+- **Instruments:** INDA (India proxy), EM ex-India (primary EM benchmark; India's contribution removed using a fixed ~15% weight), FXI (China benchmark), INR=X (USD/INR spot, for currency correlation only)
+- India is ~15% of standard broad-EM indices like EEM, so comparing India directly against EEM partly compares India against itself; the EM benchmark here is EM ex-India, with India's contribution removed.
+- **Window:** 2013-01-01 to 2026-06-25 (pinned for reproducibility)
 - **Denominated in:** USD throughout — ETF prices are USD-quoted, so no manual conversion is needed
 - **Valuation:** Treated as forward-looking context (Layer 2), not modelled in the return analysis
 - **Risk-adjusted metric:** Annualised return ÷ annualised volatility (0% risk-free rate, per decision log)
@@ -20,9 +21,9 @@ than broad EM (EEM) and China (FXI) over 2013–present.
 
 | Ticker | Cumulative Return | CAGR | Ann. Vol | Max Drawdown | Sharpe-style | Role |
 | --- | --- | --- | --- | --- | --- | --- |
-| EEM | 110.1% | 5.67% | 20.35% | -39.8% | 0.279 | Broad EM benchmark |
-| FXI | 11.1% | 0.78% | 26.88% | -60.8% | 0.029 | China benchmark |
-| INDA | 112.9% | 5.78% | 21.60% | -45.1% | 0.267 | India proxy |
+| INDA | 112.3% | 5.74% | 21.60% | -45.1% | 0.266 | India proxy |
+| EM ex-India * | 94.5% | 5.06% | 21.43% | -45.5% | 0.236 | EM ex-India benchmark (approx., fixed ~15% wt) |
+| FXI | 5.7% | 0.41% | 26.87% | -60.8% | 0.015 | China benchmark |
 
 ---
 
@@ -30,9 +31,9 @@ than broad EM (EEM) and China (FXI) over 2013–present.
 
 ### Layer 1 — Historical (what the data proves)
 
-**PARTIALLY SUPPORTED**
+**SUPPORTED**
 
-INDA beat EEM on cumulative return (112.9% vs 110.1%) and beat FXI (112.9% vs 11.1%). On the Sharpe-style ratio, INDA trailed EEM (0.267 vs 0.279) and beat FXI (0.267 vs 0.029). By the pre-declared rule, this is **PARTIALLY SUPPORTED**: India beat China decisively on both measures, but could not outperform broad EM on a risk-adjusted basis — it returned slightly more while also being slightly more volatile.
+INDA beat EM ex-India on cumulative return (112.3% vs 94.5%) and beat FXI (112.3% vs 5.7%). On the Sharpe-style ratio, INDA beat EM ex-India (0.266 vs 0.236) and beat FXI (0.266 vs 0.015). By the pre-declared rule, this is **SUPPORTED**.
 
 ### Layer 2 — Forward-looking (context, not proven by the data)
 

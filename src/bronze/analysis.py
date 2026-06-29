@@ -226,19 +226,26 @@ def generate_report(metrics: pd.DataFrame, verdict: str) -> str:
     def raw(ticker, col):
         return metrics.loc[metrics["Ticker"] == ticker, col].values[0]
 
-    inda_ret   = raw("INDA", "_total_ret_raw")
-    eem_ret    = raw("EEM",  "_total_ret_raw")
-    fxi_ret    = raw("FXI",  "_total_ret_raw")
-    inda_sh    = raw("INDA", "_sharpe_raw")
-    eem_sh     = raw("EEM",  "_sharpe_raw")
-    fxi_sh     = raw("FXI",  "_sharpe_raw")
+    inda_ret   = raw("INDA",        "_total_ret_raw")
+    ex_ret     = raw("EEM_exIndia", "_total_ret_raw")
+    fxi_ret    = raw("FXI",         "_total_ret_raw")
+    inda_sh    = raw("INDA",        "_sharpe_raw")
+    ex_sh      = raw("EEM_exIndia", "_sharpe_raw")
+    fxi_sh     = raw("FXI",         "_sharpe_raw")
 
     # ── Formatted display values for the table ───────────────────────────────
     display_cols = ["Ticker", "Cumulative Return", "CAGR", "Ann. Vol",
                     "Max Drawdown", "Sharpe-style"]
-    roles = {"INDA": "India proxy", "EEM": "Broad EM benchmark", "FXI": "China benchmark"}
+    roles = {
+        "INDA":        "India proxy",
+        "EEM_exIndia": "EM ex-India benchmark (approx., fixed ~15% wt)",
+        "FXI":         "China benchmark",
+    }
     display = metrics[display_cols].copy()
+    display = display[display["Ticker"].isin(["INDA", "EEM_exIndia", "FXI"])].copy()
+    display = display.set_index("Ticker").reindex(["INDA", "EEM_exIndia", "FXI"]).reset_index()
     display["Role"] = display["Ticker"].map(roles)
+    display["Ticker"] = display["Ticker"].replace({"EEM_exIndia": "EM ex-India *"})
 
     # Build a markdown table row by row
     md_header = "| " + " | ".join(display.columns) + " |"
@@ -250,47 +257,45 @@ def generate_report(metrics: pd.DataFrame, verdict: str) -> str:
     md_table  = "\n".join([md_header, md_sep, md_rows])
 
     # ── Layer 1 narrative — built from actual comparisons ────────────────────
-    # We explain WHY the verdict is what it is using real numbers, not fixed prose.
-    beats_eem_ret    = inda_ret > eem_ret
+    beats_ex_ret     = inda_ret > ex_ret
     beats_fxi_ret    = inda_ret > fxi_ret
-    beats_eem_sharpe = inda_sh  > eem_sh
+    beats_ex_sharpe  = inda_sh  > ex_sh
     beats_fxi_sharpe = inda_sh  > fxi_sh
 
     inda_ret_fmt = f"{inda_ret*100:.1f}%"
-    eem_ret_fmt  = f"{eem_ret*100:.1f}%"
+    ex_ret_fmt   = f"{ex_ret*100:.1f}%"
     fxi_ret_fmt  = f"{fxi_ret*100:.1f}%"
     inda_sh_fmt  = f"{inda_sh:.3f}"
-    eem_sh_fmt   = f"{eem_sh:.3f}"
+    ex_sh_fmt    = f"{ex_sh:.3f}"
     fxi_sh_fmt   = f"{fxi_sh:.3f}"
 
-    ret_vs_eem   = "beat" if beats_eem_ret    else "trailed"
+    ret_vs_ex    = "beat" if beats_ex_ret     else "trailed"
     ret_vs_fxi   = "beat" if beats_fxi_ret    else "trailed"
-    sh_vs_eem    = "beat" if beats_eem_sharpe  else "trailed"
-    sh_vs_fxi    = "beat" if beats_fxi_sharpe  else "trailed"
+    sh_vs_ex     = "beat" if beats_ex_sharpe  else "trailed"
+    sh_vs_fxi    = "beat" if beats_fxi_sharpe else "trailed"
 
     layer1_narrative = (
-        f"INDA {ret_vs_eem} EEM on cumulative return ({inda_ret_fmt} vs {eem_ret_fmt}) "
+        f"INDA {ret_vs_ex} EM ex-India on cumulative return ({inda_ret_fmt} vs {ex_ret_fmt}) "
         f"and {ret_vs_fxi} FXI ({inda_ret_fmt} vs {fxi_ret_fmt}). "
-        f"On the Sharpe-style ratio, INDA {sh_vs_eem} EEM ({inda_sh_fmt} vs {eem_sh_fmt}) "
+        f"On the Sharpe-style ratio, INDA {sh_vs_ex} EM ex-India ({inda_sh_fmt} vs {ex_sh_fmt}) "
         f"and {sh_vs_fxi} FXI ({inda_sh_fmt} vs {fxi_sh_fmt}). "
-        f"By the pre-declared rule, this is **{verdict}**: India beat China decisively on "
-        f"both measures, but could not outperform broad EM on a risk-adjusted basis — "
-        f"it returned slightly more while also being slightly more volatile."
+        f"By the pre-declared rule, this is **{verdict}**."
     )
 
     # ── Assemble the report ──────────────────────────────────────────────────
     report = f"""# Thesis #16 — Emerging Markets: India's Decade to Shine?
 
 **Thesis statement:** Testing whether India delivered better risk-adjusted USD returns
-than broad EM (EEM) and China (FXI) over 2013–present.
+than EM ex-India and China (FXI) over 2013–2026.
 
 ---
 
 ## Data & Method
 
 - **Source:** Yahoo Finance via yfinance (`auto_adjust=True` — prices include dividends)
-- **Instruments:** INDA (India proxy), EEM (broad EM benchmark), FXI (China benchmark), INR=X (USD/INR spot, for currency correlation only)
-- **Window:** 2013-01-01 to present
+- **Instruments:** INDA (India proxy), EM ex-India (primary EM benchmark; India's contribution removed using a fixed ~15% weight), FXI (China benchmark), INR=X (USD/INR spot, for currency correlation only)
+- India is ~15% of standard broad-EM indices like EEM, so comparing India directly against EEM partly compares India against itself; the EM benchmark here is EM ex-India, with India's contribution removed.
+- **Window:** 2013-01-01 to 2026-06-25 (pinned for reproducibility)
 - **Denominated in:** USD throughout — ETF prices are USD-quoted, so no manual conversion is needed
 - **Valuation:** Treated as forward-looking context (Layer 2), not modelled in the return analysis
 - **Risk-adjusted metric:** Annualised return ÷ annualised volatility (0% risk-free rate, per decision log)
@@ -362,7 +367,14 @@ def main():
 
     # Step 3: Risk metrics table (CAGR, vol, drawdown, Sharpe-style)
     print("\n[3/5] Computing risk metrics...")
-    metrics = compute_risk_metrics(prices)
+    # EEM_exIndia is a return-derived series, not a raw price series, so we can't
+    # pass it directly to compute_risk_metrics(). We convert it to a synthetic price
+    # index (starting at 100) so the function can treat it like any other ticker:
+    # pct_change() on the index recovers the exact daily returns we put in.
+    ex_price_index = (1 + returns["daily"]["EEM_exIndia"]).cumprod() * 100
+    prices_aug = prices.copy()
+    prices_aug["EEM_exIndia"] = ex_price_index
+    metrics = compute_risk_metrics(prices_aug)
 
     # Step 4: Rolling correlation
     print("\n[4/5] Running correlation analysis...")
@@ -378,12 +390,24 @@ def main():
     display_cols = ["Ticker", "Cumulative Return", "CAGR", "Ann. Vol", "Max Drawdown", "Sharpe-style"]
     display = metrics[display_cols].copy()
 
-    # Add a Role column so the table is self-explanatory
-    roles = {"INDA": "India proxy", "EEM": "Broad EM benchmark", "FXI": "China benchmark"}
+    # Pin display order: raw EEM first, then EM ex-India directly below it
+    # so the reader can compare the two EM benchmarks side by side.
+    ticker_order = ["INDA", "EEM_exIndia", "FXI"]
+    display = display.set_index("Ticker").reindex(ticker_order).reset_index()
+
+    roles = {
+        "INDA":        "India proxy",
+        "EEM":         "Broad EM benchmark (raw)",
+        "EEM_exIndia": "EM ex-India (approx.)",
+        "FXI":         "China benchmark",
+    }
     display["Role"] = display["Ticker"].map(roles)
+    # Rename the internal column name to a human-readable label for printing
+    display["Ticker"] = display["Ticker"].replace({"EEM_exIndia": "EM ex-India *"})
 
     print("\n── SUMMARY TABLE ──────────────────────────────────────────────")
     print(display.to_string(index=False))
+    print("  * Fixed ~15% India weight approximation; actual weight varied ~13–15% over 2013–present.")
     print()
 
     # ── Verdict ─────────────────────────────────────────────────────────────

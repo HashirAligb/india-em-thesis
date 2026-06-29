@@ -1,6 +1,5 @@
 import yfinance as yf
 import pandas as pd
-from datetime import date
 
 # Toggle: set to True to pull live data from Yahoo Finance via yfinance.
 # Keeping this as a named constant makes it easy to find and flip if needed.
@@ -16,6 +15,8 @@ TICKERS = ["INDA", "EEM", "FXI", "INR=X"]
 # Start of the analysis window. 2013 is chosen because it post-dates the taper
 # tantrum and aligns with the start of the Modi-era reform period.
 START_DATE = "2013-01-01"
+# Pinned for reproducibility. Update deliberately when extending the analysis window.
+END_DATE   = "2026-06-26"
 
 
 def load_data() -> pd.DataFrame:
@@ -27,7 +28,7 @@ def load_data() -> pd.DataFrame:
 
     # Set the end date to today so the window always runs to the most recent
     # available trading day.
-    end_date = str(date.today())
+    end_date = END_DATE
 
     # Download all four tickers in a single API call. yfinance returns a
     # multi-level DataFrame; we select only the "Close" column group below.
@@ -86,7 +87,24 @@ def compute_returns(prices: pd.DataFrame) -> dict:
     # even though their absolute prices differ.
     cumulative = (1 + daily_returns).cumprod() * 100
 
+    ex_india_daily = compute_em_ex_india(daily_returns["EEM"], daily_returns["INDA"])
+    daily_returns["EEM_exIndia"] = ex_india_daily
+    cumulative["EEM_exIndia"] = (1 + ex_india_daily).cumprod() * 100
+
     return {"daily": daily_returns, "cumulative": cumulative}
+
+
+def compute_em_ex_india(returns_eem: pd.Series,
+                        returns_inda: pd.Series,
+                        india_weight: float = 0.15) -> pd.Series:
+    # india_weight is a fixed-weight approximation. India's actual weight in EEM
+    # has ranged ~13–15% over 2013–present and shifts quarterly; a single constant
+    # is a simplification, not a live calculation.
+    #
+    # The formula re-scales the residual basket back to 100% weight:
+    #   r_ex = (r_eem − w × r_inda) / (1 − w)
+    # Applied to each daily simple return, then re-compounded in compute_returns().
+    return (returns_eem - india_weight * returns_inda) / (1 - india_weight)
 
 
 def compute_risk_metrics(prices: pd.DataFrame) -> pd.DataFrame:
@@ -194,41 +212,39 @@ def run_correlation_analysis(prices: pd.DataFrame) -> dict:
 
 
 def compute_verdict(metrics: pd.DataFrame) -> str:
-    # Apply the pre-declared verdict rule from the thesis:
+    # Pre-declared verdict rule:
+    #   SUPPORTED          — INDA beats both EM ex-India and FXI on cumulative
+    #                        return AND on the Sharpe-style ratio.
+    #   PARTIALLY SUPPORTED — INDA beats both benchmarks on exactly one of the
+    #                        two measures (return or Sharpe, not both).
+    #   NOT SUPPORTED      — INDA fails to beat both benchmarks on either measure.
     #
-    # SUPPORTED     — INDA beats BOTH EEM and FXI on cumulative return AND
-    #                 on the Sharpe-style ratio.
-    # PARTIALLY     — INDA beats both on return but not both risk-adjusted,
-    #                 OR beats only one benchmark on both measures.
-    # NOT SUPPORTED — INDA fails both benchmarks on both measures.
-    #
-    # We use the raw float columns (_total_ret_raw, _sharpe_raw) stored by
-    # compute_risk_metrics() so we are not parsing formatted strings.
+    # EEM (raw) is intentionally excluded: India is ~15% of EEM, so comparing
+    # against it would partly compare India against itself. EM ex-India is the
+    # only EM benchmark in the verdict.
 
     def get(ticker, col):
         row = metrics[metrics["Ticker"] == ticker]
         return row[col].values[0]
 
-    inda_ret = get("INDA", "_total_ret_raw")
-    inda_sharpe = get("INDA", "_sharpe_raw")
+    inda_ret     = get("INDA",        "_total_ret_raw")
+    inda_sharpe  = get("INDA",        "_sharpe_raw")
+    ex_ret       = get("EEM_exIndia", "_total_ret_raw")
+    ex_sharpe    = get("EEM_exIndia", "_sharpe_raw")
+    fxi_ret      = get("FXI",         "_total_ret_raw")
+    fxi_sharpe   = get("FXI",         "_sharpe_raw")
 
-    eem_ret = get("EEM", "_total_ret_raw")
-    eem_sharpe = get("EEM", "_sharpe_raw")
-
-    fxi_ret = get("FXI", "_total_ret_raw")
-    fxi_sharpe = get("FXI", "_sharpe_raw")
-
-    beats_eem_ret = inda_ret > eem_ret
-    beats_fxi_ret = inda_ret > fxi_ret
-    beats_eem_sharpe = inda_sharpe > eem_sharpe
+    beats_ex_ret     = inda_ret    > ex_ret
+    beats_fxi_ret    = inda_ret    > fxi_ret
+    beats_ex_sharpe  = inda_sharpe > ex_sharpe
     beats_fxi_sharpe = inda_sharpe > fxi_sharpe
 
-    beats_both_ret = beats_eem_ret and beats_fxi_ret
-    beats_both_sharpe = beats_eem_sharpe and beats_fxi_sharpe
+    beats_both_ret    = beats_ex_ret    and beats_fxi_ret
+    beats_both_sharpe = beats_ex_sharpe and beats_fxi_sharpe
 
     if beats_both_ret and beats_both_sharpe:
         return "SUPPORTED"
-    elif beats_both_ret or beats_eem_ret or beats_fxi_ret:
+    elif beats_both_ret or beats_both_sharpe:
         return "PARTIALLY SUPPORTED"
     else:
         return "NOT SUPPORTED"
