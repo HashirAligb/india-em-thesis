@@ -59,6 +59,13 @@ desktop.ini
 .project
 .pydevproject
 
+# Claude Code — local tool permissions, not part of the analysis
+.claude/settings.local.json
+
+# Scratch / working files — not committed
+scratch/
+HANDOFF.md
+
 # Testing & coverage
 .pytest_cache/
 .coverage
