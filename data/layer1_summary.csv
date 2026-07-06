@@ -1,0 +1,4 @@
+ticker,display_name,role,cumulative_return_pct,cagr_pct,ann_vol_pct,max_drawdown_pct,sharpe_style
+INDA,INDA,India proxy,112.3,5.74,21.60,-45.1,0.266
+EEM_exIndia,EM ex-India *,EM ex-India benchmark (approx. fixed ~15% wt),94.5,5.06,21.43,-45.5,0.236
+FXI,FXI,China benchmark,5.7,0.41,26.87,-60.8,0.015

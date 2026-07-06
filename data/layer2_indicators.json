@@ -1,0 +1,403 @@
+{
+  "metadata": {
+    "description": "Layer 2 Forward-Durability Framework: five indicator data, source-tagged",
+    "data_note": "Data are pinned to the locked mid-2026 case-study dataset. API-backed sources are flagged refreshable for future updates; this version does not auto-refresh, to stay consistent with the report.",
+    "created": "2026-07-06"
+  },
+  "indicators": {
+    "valuation": {
+      "name": "Valuation",
+      "role": "gating",
+      "score": "neutral_to_caution",
+      "score_display": "Neutral-to-Caution",
+      "score_color": "amber",
+      "gate_trips_severe": false,
+      "score_summary": "India's P/E premium to EM ex-India is ~24%, placing it in the caution band. The premium is real but not at a historical extreme, so the gate does not trip severe. Caps confidence; does not break the thesis.",
+      "data_points": [
+        {
+          "id": "inda_pe",
+          "label": "INDA trailing P/E",
+          "value": 22.35,
+          "unit": "ratio",
+          "as_of": "2026-07-01",
+          "source": "iShares INDA fund page (ishares.com)",
+          "source_type": "manual",
+          "refreshable": false
+        },
+        {
+          "id": "msci_em_pe",
+          "label": "MSCI EM trailing P/E",
+          "value": 18.60,
+          "unit": "ratio",
+          "as_of": "2026-05-29",
+          "source": "MSCI EM factsheet",
+          "source_type": "manual",
+          "refreshable": false
+        },
+        {
+          "id": "india_weight_low",
+          "label": "India weight in EM (low)",
+          "value": 0.12,
+          "unit": "fraction",
+          "as_of": "2026-07-01",
+          "source": "MSCI (approximate range)",
+          "source_type": "manual",
+          "refreshable": false
+        },
+        {
+          "id": "india_weight_high",
+          "label": "India weight in EM (high)",
+          "value": 0.15,
+          "unit": "fraction",
+          "as_of": "2026-07-01",
+          "source": "MSCI (approximate range)",
+          "source_type": "manual",
+          "refreshable": false
+        },
+        {
+          "id": "premium_w12",
+          "label": "India P/E premium to EM ex-India (w=12%)",
+          "value": 0.236,
+          "unit": "fraction",
+          "as_of": "2026-07-02",
+          "source": "Derived: (EM_PE - w*India_PE)/(1-w), then India_PE/EM_ex_PE - 1",
+          "source_type": "derived",
+          "refreshable": false
+        },
+        {
+          "id": "premium_w13",
+          "label": "India P/E premium to EM ex-India (w=13%)",
+          "value": 0.239,
+          "unit": "fraction",
+          "as_of": "2026-07-02",
+          "source": "Derived: same ex-India construction as Layer 1 benchmark correction",
+          "source_type": "derived",
+          "refreshable": false
+        },
+        {
+          "id": "premium_w15",
+          "label": "India P/E premium to EM ex-India (w=15%)",
+          "value": 0.246,
+          "unit": "fraction",
+          "as_of": "2026-07-02",
+          "source": "Derived: same ex-India construction as Layer 1 benchmark correction",
+          "source_type": "derived",
+          "refreshable": false
+        },
+        {
+          "id": "raw_premium",
+          "label": "Raw India P/E premium to uncorrected MSCI EM",
+          "value": 0.202,
+          "unit": "fraction",
+          "as_of": "2026-07-02",
+          "source": "Derived: 22.35 / 18.60 - 1",
+          "source_type": "derived",
+          "refreshable": false
+        }
+      ],
+      "premium_bands": [
+        {"label": "Favorable",          "range_low": 0,    "range_high": 0.10, "color": "green"},
+        {"label": "Neutral",             "range_low": 0.10, "range_high": 0.20, "color": "lightgreen"},
+        {"label": "Caution",             "range_low": 0.20, "range_high": 0.30, "color": "amber"},
+        {"label": "At-risk",             "range_low": 0.30, "range_high": 0.40, "color": "orange"},
+        {"label": "Severe (gate trips)", "range_low": 0.40, "range_high": null,  "color": "red"}
+      ],
+      "historical_context": {
+        "summary": "Multiple credible sources report India's premium compressed below its 10-year average as of late 2025 to early 2026. Exact historical averages are behind Bloomberg/FactSet; direction only.",
+        "sources": [
+          {
+            "label": "Goldman via Reuters (Nov 10 2025)",
+            "description": "India's valuation premium to EM described as sharply lower vs Sept 2024, and defensible.",
+            "url": "https://www.reuters.com/world/india/goldman-sachs-upgrades-india-back-overweight-sees-nifty-rising-14-by-2026-end-2025-11-10/",
+            "as_of": "2025-11-10"
+          },
+          {
+            "label": "Goldman via Reuters (Dec 31 2025)",
+            "description": "India's premium to global/EM had dipped below its 10-year average after 2025 underperformance.",
+            "url": "https://www.reuters.com/world/india/earnings-policy-support-set-lift-indian-equities-after-2025-underperformance-2025-12-31/",
+            "as_of": "2025-12-31"
+          },
+          {
+            "label": "Reuters (Jul 1 2026)",
+            "description": "India's premium seen as more attractive after underperformance, though valuations remained relatively full.",
+            "url": "https://www.reuters.com/world/india/global-funds-revisit-indian-stocks-oil-rupee-risks-recede-2026-07-01/",
+            "as_of": "2026-07-01"
+          }
+        ]
+      },
+      "acknowledged_limitation": "Because the earnings-growth premium versus EM ex-India is not directly measured, the framework cannot fully determine whether India's valuation premium is justified. This is the main unresolved link between structural opportunity and future equity returns."
+    },
+
+    "demographics": {
+      "name": "Demographics",
+      "role": "structural",
+      "score": "favorable",
+      "score_display": "Favorable",
+      "score_color": "green",
+      "score_summary": "India's age structure is a genuine, durable, decade-plus advantage. Old-age dependency is less than half China's. The dividend is only partially realized (female LFP at 35%), which is both a shortfall and remaining upside.",
+      "data_points": [
+        {
+          "id": "old_age_dep_india",
+          "label": "Old-age dependency ratio: India",
+          "value": 10,
+          "unit": "ratio (dependents per 100 working-age)",
+          "as_of": "2024",
+          "source": "World Bank / UN 2024",
+          "source_type": "API",
+          "refreshable": true
+        },
+        {
+          "id": "old_age_dep_china",
+          "label": "Old-age dependency ratio: China",
+          "value": 21,
+          "unit": "ratio (dependents per 100 working-age)",
+          "as_of": "2024",
+          "source": "World Bank / UN 2024",
+          "source_type": "API",
+          "refreshable": true
+        },
+        {
+          "id": "total_dep_india",
+          "label": "Total age dependency ratio: India",
+          "value": 47,
+          "unit": "ratio (dependents per 100 working-age)",
+          "as_of": "2024",
+          "source": "World Bank / UN 2024",
+          "source_type": "API",
+          "refreshable": true
+        },
+        {
+          "id": "total_dep_china",
+          "label": "Total age dependency ratio: China",
+          "value": 50,
+          "unit": "ratio (dependents per 100 working-age)",
+          "as_of": "2024",
+          "source": "World Bank / UN 2024",
+          "source_type": "API",
+          "refreshable": true
+        },
+        {
+          "id": "female_lfp_india",
+          "label": "Female labor force participation: India",
+          "value": 35,
+          "unit": "percent",
+          "as_of": "2024",
+          "source": "World Bank / UN 2024",
+          "source_type": "API",
+          "refreshable": true
+        },
+        {
+          "id": "total_lfp_india",
+          "label": "Total labor force participation: India",
+          "value": 59.1,
+          "unit": "percent",
+          "as_of": "2024",
+          "source": "World Bank / UN 2024",
+          "source_type": "API",
+          "refreshable": true
+        }
+      ],
+      "conversion_caveat": "A demographic dividend requires conversion into employment. Female LFP at 35% means the dividend is only partially realized, which is both a current shortfall and remaining upside if participation rises."
+    },
+
+    "governance": {
+      "name": "Governance",
+      "role": "structural",
+      "score": "neutral_lean_negative",
+      "score_display": "Neutral / Lean-Negative",
+      "score_color": "amber",
+      "score_summary": "India's governance profile is mixed against China and against a zero baseline. Clear advantage on Voice and Accountability has compressed and turned negative by 2023. China leads on Government Effectiveness and Control of Corruption. India better on Rule of Law, but both are in negative territory.",
+      "data_points": [
+        {
+          "id": "wgi_source",
+          "label": "Source dataset",
+          "value": "World Bank WGI 2025 (wgidataset_with_sourcedata-2025.xlsx)",
+          "unit": "text",
+          "as_of": "2026-07-02",
+          "source": "World Bank WGI API (source=28)",
+          "source_type": "API",
+          "refreshable": true
+        }
+      ],
+      "wgi_table": {
+        "scale": "Governance estimate: -2.5 (worst) to +2.5 (best)",
+        "years": [2014, 2019, 2023],
+        "dimensions": [
+          {
+            "name": "Voice and Accountability",
+            "india": {"2014": 0.26,  "2019": 0.11,  "2023": -0.14},
+            "china": {"2014": -1.36, "2019": -1.50, "2023": -1.65}
+          },
+          {
+            "name": "Political Stability and Abs. of Violence",
+            "india": {"2014": -0.82, "2019": -0.59, "2023": -0.84},
+            "china": {"2014": -0.52, "2019": -0.14, "2023": -0.17}
+          },
+          {
+            "name": "Government Effectiveness",
+            "india": {"2014": -0.01, "2019": 0.51,  "2023": 0.42},
+            "china": {"2014": 0.49,  "2019": 0.67,  "2023": 0.78}
+          },
+          {
+            "name": "Regulatory Quality",
+            "india": {"2014": -0.38, "2019": -0.10, "2023": -0.13},
+            "china": {"2014": -0.17, "2019": -0.06, "2023": -0.08}
+          },
+          {
+            "name": "Rule of Law",
+            "india": {"2014": -0.17, "2019": -0.02, "2023": -0.09},
+            "china": {"2014": -0.69, "2019": -0.55, "2023": -0.55}
+          },
+          {
+            "name": "Control of Corruption",
+            "india": {"2014": -0.41, "2019": -0.22, "2023": -0.34},
+            "china": {"2014": -0.30, "2019": -0.05, "2023": 0.11}
+          }
+        ]
+      }
+    },
+
+    "digital_adoption": {
+      "name": "Digital Financial Adoption",
+      "role": "structural",
+      "score": "neutral",
+      "score_display": "Neutral (negative level, positive trend)",
+      "score_color": "gray",
+      "score_summary": "India lags the EM peer median by 23-33pp on digital payment adoption. Adoption is rising fast and consistently from a low base: any-digital-payment went from 22% (2014) to 48% (2024). A convergence-from-behind story, not established leadership.",
+      "honest_note": "This indicator was added to test the thesis's digital infrastructure bull pillar. The data partially disconfirms it: India's digital story is real but not a competitive advantage vs EM peers yet.",
+      "data_points": [
+        {
+          "id": "india_any_dig_2024",
+          "label": "India: any digital payment (2024)",
+          "value": 48,
+          "unit": "percent of adults age 15+",
+          "as_of": "2024",
+          "source": "World Bank Global Findex Database (source=28), indicator g20.any",
+          "source_type": "API",
+          "refreshable": true
+        },
+        {
+          "id": "peer_median_any_dig_2024",
+          "label": "EM peer median: any digital payment (2024)",
+          "value": 71,
+          "unit": "percent of adults age 15+",
+          "as_of": "2024",
+          "source": "World Bank Global Findex Database (source=28), indicator g20.any; peers: China, Indonesia, Brazil, Mexico, South Africa, Turkey, Thailand, Malaysia, Philippines",
+          "source_type": "API",
+          "refreshable": true
+        },
+        {
+          "id": "india_merchant_2024",
+          "label": "India: digital merchant payment (2024)",
+          "value": 18,
+          "unit": "percent of adults age 15+",
+          "as_of": "2024",
+          "source": "World Bank Global Findex Database (source=28), indicator merchant.pay",
+          "source_type": "API",
+          "refreshable": true
+        },
+        {
+          "id": "peer_median_merchant_2024",
+          "label": "EM peer median: digital merchant payment (2024)",
+          "value": 51,
+          "unit": "percent of adults age 15+",
+          "as_of": "2024",
+          "source": "World Bank Global Findex Database (source=28), indicator merchant.pay",
+          "source_type": "API",
+          "refreshable": true
+        }
+      ],
+      "india_trend_any_digital": [
+        {"year": 2014, "value": 22},
+        {"year": 2017, "value": 29},
+        {"year": 2021, "value": 35},
+        {"year": 2024, "value": 48}
+      ],
+      "india_trend_merchant": [
+        {"year": 2021, "value": 12},
+        {"year": 2024, "value": 18}
+      ],
+      "peer_table_2024": [
+        {"country": "India",        "any_digital": 48, "merchant": 18},
+        {"country": "China",        "any_digital": 89, "merchant": 80},
+        {"country": "Indonesia",    "any_digital": 43, "merchant": 14},
+        {"country": "Brazil",       "any_digital": 77, "merchant": 60},
+        {"country": "Mexico",       "any_digital": 41, "merchant": 26},
+        {"country": "South Africa", "any_digital": 67, "merchant": 47},
+        {"country": "Turkey",       "any_digital": 71, "merchant": 52},
+        {"country": "Thailand",     "any_digital": 83, "merchant": 51},
+        {"country": "Malaysia",     "any_digital": 78, "merchant": 52},
+        {"country": "Philippines",  "any_digital": 40, "merchant": 13}
+      ]
+    },
+
+    "external_macro": {
+      "name": "External Macro Vulnerability",
+      "role": "gating",
+      "score": "at_risk_mild",
+      "score_display": "At-Risk (mild-to-conditional)",
+      "score_color": "orange",
+      "gate_trips_severe": false,
+      "score_summary": "Real external vulnerability, but the persistent piece (currency drag) is mild and survivable. The severe piece (oil shock) is conditional, not structural. Caps confidence at the margin.",
+      "note": "Currency drag and oil exposure are scored as one indicator because oil shocks and rupee depreciation are largely the same underlying macro risk. Scoring them separately would double-count one vulnerability.",
+      "data_points": [
+        {
+          "id": "inr_depreciation_rate",
+          "label": "INR depreciation vs USD (approximate annual rate)",
+          "value": "3-4% per year",
+          "unit": "text",
+          "as_of": "2026-07-01",
+          "source": "MUFG, UBS, Reuters consensus poll",
+          "source_type": "manual",
+          "refreshable": false
+        },
+        {
+          "id": "oil_import_share",
+          "label": "Oil as share of India's import bill",
+          "value": "approximately 25%",
+          "unit": "text",
+          "as_of": "2026-07-01",
+          "source": "Reuters / public macro sources",
+          "source_type": "manual",
+          "refreshable": false
+        },
+        {
+          "id": "oil_import_dependency",
+          "label": "Share of India's oil consumption that is imported",
+          "value": "over 90%",
+          "unit": "text",
+          "as_of": "2026-07-01",
+          "source": "Reuters / public macro sources",
+          "source_type": "manual",
+          "refreshable": false
+        },
+        {
+          "id": "inda_inr_correlation",
+          "label": "INDA vs INR rolling 12-month correlation (Layer 1 finding)",
+          "value": "approximately 0",
+          "unit": "text",
+          "as_of": "2026-06-25",
+          "source": "Layer 1 rolling correlation analysis (src/data_engine.py)",
+          "source_type": "API",
+          "refreshable": true
+        }
+      ]
+    }
+  },
+
+  "ladder_verdict": {
+    "rung": 3,
+    "label": "Structurally attractive, but priced and macro-sensitive",
+    "scoring_summary": [
+      {"indicator": "Valuation",                   "role": "Gating",         "score": "Neutral-to-Caution"},
+      {"indicator": "Demographics",                 "role": "Structural",     "score": "Favorable"},
+      {"indicator": "Governance",                   "role": "Structural",     "score": "Neutral / Lean-Negative"},
+      {"indicator": "Digital Adoption",             "role": "Structural",     "score": "Neutral (negative level, positive trend)"},
+      {"indicator": "External Macro Vulnerability", "role": "Gating (soft)",  "score": "At-Risk (mild-to-conditional)"}
+    ],
+    "derivation": "Neither gate tripped severe (valuation neutral-to-caution; external macro at-risk mild-conditional). The structural case is one strong pillar (demographics) plus two neutrals (governance lean-negative, digital adoption neutral). Per the pre-declared ladder rule: no severe gate plus incomplete structural support leads to Rung 3, not Rung 2.",
+    "verdict_statement": "India's opportunity is real, especially through demographics, but the broader structural case is less decisive than the original bull narrative suggested. Governance is mixed, digital adoption is improving but not yet EM-leading, valuation still embeds a meaningful premium, and external macro risks remain live. The thesis is not broken (no gate trips severe), but future outperformance is conditional on earnings growth continuing to justify the premium.",
+    "thesis_answer": "India's opportunity is real, but narrower than the original bull case implied. The market has partially priced in that opportunity through a meaningful valuation premium, though not to an obvious bubble or extreme level. The forward case is therefore conditionally durable: India can keep outperforming if earnings growth validates the premium, but the margin for disappointment is limited.",
+    "analysts_journey": "Started India-skeptic / China-bull. Layer 1 disproved the historical skepticism (India clearly outperformed). Layer 2 vindicates the forward caution (real but priced, conditionally durable). The disproven hypothesis and the final verdict are consistent: the skepticism was wrong about the past, right to persist about the price going forward."
+  }
+}
