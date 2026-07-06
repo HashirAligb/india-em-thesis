@@ -208,7 +208,21 @@ def run_correlation_analysis(prices: pd.DataFrame) -> dict:
         .dropna()
     )
 
-    return {"INDA_EEM": corr_inda_eem, "INDA_INR": corr_inda_inr}
+    result = {"INDA_EEM": corr_inda_eem, "INDA_INR": corr_inda_inr}
+
+    # If the EEM_exIndia synthetic series is present (added by the caller via
+    # prices_aug), compute its rolling correlation with INDA so charts can use
+    # the corrected benchmark instead of raw EEM.
+    if "EEM_exIndia" in prices.columns:
+        pair_ex = all_returns[["INDA", "EEM_exIndia"]].dropna()
+        result["INDA_EEM_exIndia"] = (
+            pair_ex["INDA"]
+            .rolling(window)
+            .corr(pair_ex["EEM_exIndia"])
+            .dropna()
+        )
+
+    return result
 
 
 def compute_verdict(metrics: pd.DataFrame) -> str:

@@ -33,7 +33,8 @@ WHITE = "#F4F6F9"
 TEAL  = "#1A7FA1"
 
 # One consistent colour per ticker so every chart reads the same legend
-TICKER_COLORS = {"INDA": GOLD, "EEM": TEAL, "FXI": RED}
+TICKER_COLORS = {"INDA": GOLD, "EEM_exIndia": TEAL, "FXI": RED}
+TICKER_LABELS = {"INDA": "INDA", "EEM_exIndia": "EM ex-India", "FXI": "FXI"}
 
 # Where the PNGs go — resolved relative to this file so it works regardless
 # of which directory you launch from
@@ -68,13 +69,13 @@ def chart_cumulative_return(cumulative: pd.DataFrame) -> str:
             cumulative[ticker],
             color=TICKER_COLORS[ticker],
             linewidth=1.8,
-            label=ticker,
+            label=TICKER_LABELS.get(ticker, ticker),
         )
 
     ax.axhline(100, color=SLATE, linewidth=0.8, linestyle="--", alpha=0.5)
 
     ax.set_title(
-        "Cumulative USD Return — Growth of $100 (2013–present)",
+        "Cumulative USD Return: Growth of $100 (2013 to present)",
         color=WHITE, fontsize=13, pad=12,
     )
     ax.set_xlabel("Date", color=SLATE)
@@ -91,7 +92,7 @@ def chart_vol_drawdown(metrics: pd.DataFrame) -> str:
     # for each ETF. Grouping them together makes the risk profile comparison
     # immediate — you can see in one glance which ETF was bumpiest.
 
-    etf_order = ["INDA", "EEM", "FXI"]
+    etf_order = ["INDA", "EEM_exIndia", "FXI"]
     metrics_plot = metrics[metrics["Ticker"].isin(etf_order)].set_index("Ticker")
     metrics_plot = metrics_plot.reindex(etf_order)
 
@@ -124,7 +125,7 @@ def chart_vol_drawdown(metrics: pd.DataFrame) -> str:
         )
 
     ax.set_xticks(list(x))
-    ax.set_xticklabels(etf_order, color=WHITE)
+    ax.set_xticklabels([TICKER_LABELS.get(t, t) for t in etf_order], color=WHITE)
     ax.set_title("Annualised Volatility and Max Drawdown by ETF", color=WHITE, fontsize=13, pad=12)
     ax.set_ylabel("Percent (%)", color=SLATE)
     ax.tick_params(colors=SLATE)
@@ -143,15 +144,18 @@ def chart_rolling_correlation(corr: dict) -> str:
     fig, ax = plt.subplots(figsize=(12, 5), facecolor=NAVY)
     ax.set_facecolor(NAVY)
 
-    ax.plot(corr["INDA_EEM"].index, corr["INDA_EEM"],
-            color=TEAL, linewidth=1.6, label="INDA vs EEM")
+    em_series = corr.get("INDA_EEM_exIndia", corr.get("INDA_EEM"))
+    em_label  = "INDA vs EM ex-India" if "INDA_EEM_exIndia" in corr else "INDA vs EEM"
+
+    ax.plot(em_series.index, em_series,
+            color=TEAL, linewidth=1.6, label=em_label)
     ax.plot(corr["INDA_INR"].index, corr["INDA_INR"],
-            color=GOLD, linewidth=1.6, label="INDA vs INR=X")
+            color=GOLD, linewidth=1.6, label="INDA vs INR")
 
     ax.axhline(0, color=SLATE, linewidth=0.8, linestyle="--", alpha=0.5)
 
     ax.set_title(
-        "Rolling 12-Month Correlation — INDA vs EEM and INDA vs INR=X",
+        "Rolling 12-Month Correlation: INDA vs EM ex-India and INDA vs INR",
         color=WHITE, fontsize=13, pad=12,
     )
     ax.set_xlabel("Date", color=SLATE)
@@ -178,7 +182,7 @@ def chart_verdict_card(metrics: pd.DataFrame, verdict: str) -> str:
     ax.axis("off")  # no axes — this is a text card, not a data plot
 
     # Title
-    ax.text(0.5, 0.92, "Thesis Verdict — India vs EM (2013–present)",
+    ax.text(0.5, 0.92, "Thesis Verdict: India vs EM (2013 to present)",
             ha="center", va="top", color=WHITE, fontsize=14, fontweight="bold",
             transform=ax.transAxes)
 
@@ -376,9 +380,9 @@ def main():
     prices_aug["EEM_exIndia"] = ex_price_index
     metrics = compute_risk_metrics(prices_aug)
 
-    # Step 4: Rolling correlation
+    # Step 4: Rolling correlation — use prices_aug so EEM_exIndia is available
     print("\n[4/5] Running correlation analysis...")
-    corr = run_correlation_analysis(prices)
+    corr = run_correlation_analysis(prices_aug)
 
     # Step 5: Verdict
     print("\n[5/5] Computing verdict...")
