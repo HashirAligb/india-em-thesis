@@ -23,6 +23,157 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ── Visual theme (CSS injection) ─────────────────────────────────────────────
+# Wrapped in display:none so the <style> block applies globally but the
+# surrounding Streamlit container does not render as a visible element.
+st.markdown("""<div style="display:none"><style>
+/* --- Sidebar: warm dark mahogany --- */
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"] > div:first-child {
+    background-color: #2A0E0E !important;
+}
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] span,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p {
+    color: #E8D8C0 !important;
+}
+section[data-testid="stSidebar"] small,
+section[data-testid="stSidebar"] div[data-testid="stCaption"] p {
+    color: #A08878 !important;
+}
+section[data-testid="stSidebar"] hr {
+    border-color: #4A1A1A !important;
+}
+section[data-testid="stSidebar"] .stButton > button {
+    background-color: #3A1010 !important;
+    border: 1px solid #5C1A1B !important;
+    color: #E8D8C0 !important;
+    border-radius: 20px !important;
+    font-weight: 500 !important;
+}
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background-color: #5C1A1B !important;
+    color: #FBF7EF !important;
+    border-color: #7A2A2B !important;
+}
+
+/* --- Page headers: serif burgundy --- */
+h2 {
+    color: #5C1A1B !important;
+    font-family: Georgia, Cambria, serif !important;
+    font-weight: 800 !important;
+    border-bottom: 2px solid #5C1A1B;
+    padding-bottom: 0.3em;
+    margin-bottom: 0.5em;
+}
+h3 {
+    color: #3A1010 !important;
+    font-family: Georgia, Cambria, serif !important;
+    font-weight: 600 !important;
+}
+
+/* --- Metric cards: warm cream --- */
+[data-testid="stMetric"] {
+    background: #FBF7EF !important;
+    border: 1px solid #D8C8A8 !important;
+    border-radius: 10px !important;
+    padding: 16px 20px !important;
+    box-shadow: 0 1px 4px rgba(92,26,27,0.07) !important;
+}
+[data-testid="stMetricLabel"] div {
+    font-size: 0.75rem !important;
+    color: #8A7B6B !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+}
+[data-testid="stMetricValue"] div {
+    color: #2C1A0E !important;
+    font-weight: 700 !important;
+    font-variant-numeric: tabular-nums !important;
+}
+
+/* --- DataFrames --- */
+[data-testid="stDataFrame"] {
+    border: 1px solid #D8C8A8 !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    box-shadow: 0 1px 4px rgba(92,26,27,0.07) !important;
+}
+
+
+
+/* --- Dividers --- */
+hr {
+    border-color: #D8C8A8 !important;
+    margin-top: 1.2em !important;
+    margin-bottom: 1.2em !important;
+}
+
+/* --- Captions --- */
+div[data-testid="stCaption"] p {
+    color: #8A7B6B !important;
+    font-size: 0.82rem !important;
+}
+
+/* --- Primary buttons (sliders, expander toggles, main CTA) --- */
+.stButton > button[kind="primary"],
+.stSlider [data-baseweb="slider"] [data-testid="stThumbValue"] {
+    background-color: #5C1A1B !important;
+    color: #FBF7EF !important;
+    border-radius: 20px !important;
+}
+.stButton > button {
+    border-radius: 20px !important;
+}
+
+/* --- Download button: burgundy pill --- */
+[data-testid="stDownloadButton"] > button {
+    background-color: #5C1A1B !important;
+    color: #FBF7EF !important;
+    border: none !important;
+    border-radius: 20px !important;
+    font-weight: 600 !important;
+    padding: 0.45rem 1.4rem !important;
+    letter-spacing: 0.02em !important;
+}
+[data-testid="stDownloadButton"] > button:hover {
+    background-color: #7A2A2B !important;
+    box-shadow: 0 2px 8px rgba(92,26,27,0.28) !important;
+}
+
+/* --- Alert boxes --- */
+[data-testid="stAlert"] {
+    border-radius: 9px !important;
+    border-width: 1px !important;
+}
+
+/* --- Metric value and label: allow wrapping, never clip --- */
+[data-testid="stMetricValue"] div,
+[data-testid="stMetricValue"] > div {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    word-break: break-word !important;
+    line-height: 1.3 !important;
+}
+[data-testid="stMetricLabel"] div,
+[data-testid="stMetricLabel"] > div {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    line-height: 1.3 !important;
+}
+
+/* --- Expanders only (not all details elements) --- */
+[data-testid="stExpander"] details {
+    background-color: #FBF7EF !important;
+    border: 1px solid #D8C8A8 !important;
+    border-radius: 10px !important;
+}
+</style></div>""", unsafe_allow_html=True)
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
 ROOT          = os.path.dirname(__file__)
 DATA_DIR      = os.path.join(ROOT, "data")
@@ -48,56 +199,72 @@ with st.sidebar:
     )
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
-def verdict_badge(text: str, bg: str = "", fg: str = "#0D1B2A") -> None:
+def verdict_badge(text: str, bg: str = "", fg: str = "#FBF7EF") -> None:
     preset = {
-        "SUPPORTED":           "#2D9E6B",
-        "PARTIALLY SUPPORTED": "#C9A84C",
-        "NOT SUPPORTED":       "#E05C5C",
+        "SUPPORTED":           "#1A6B3C",
+        "PARTIALLY SUPPORTED": "#A06010",
+        "NOT SUPPORTED":       "#9C1A18",
     }
-    bg = bg or preset.get(text, "#8FA3B1")
+    bg = bg or preset.get(text, "#4A6B8A")
     st.markdown(
-        f'<div style="background:{bg};color:{fg};padding:16px 28px;'
-        f'border-radius:8px;font-size:1.4rem;font-weight:700;'
-        f'text-align:center;letter-spacing:0.05em;">{text}</div>',
+        f'<div style="background:{bg};color:{fg};padding:18px 28px;'
+        f'border-radius:10px;font-size:1.4rem;font-weight:800;'
+        f'font-family:Georgia,Cambria,serif;'
+        f'text-align:center;letter-spacing:0.06em;'
+        f'box-shadow:0 2px 10px rgba(92,26,27,0.20);">{text}</div>',
         unsafe_allow_html=True,
     )
 
 
 def score_badge_html(score_key: str, score_label: str, colors: dict) -> str:
-    c = colors.get(score_key, "#8FA3B1")
+    c = colors.get(score_key, "#4A6B8A")
     return (
-        f'<span style="background:{c}28;border:1px solid {c};color:{c};'
-        f'padding:3px 12px;border-radius:4px;font-weight:600;font-size:0.85rem;">'
+        f'<span style="background:{c}18;border:1.5px solid {c};color:{c};'
+        f'padding:4px 14px;border-radius:12px;font-weight:700;font-size:0.8rem;'
+        f'letter-spacing:0.01em;">'
         f'{score_label}</span>'
     )
 
 
 def role_chip_html(role: str) -> str:
     is_gating = "gating" in role.lower()
-    bg  = "#1a3a5c" if is_gating else "#1a3a28"
-    clr = "#7ab4d8" if is_gating else "#7abf8e"
+    bg  = "#F5E8E8" if is_gating else "#E8F0E8"
+    clr = "#8B1515" if is_gating else "#1A5A30"
     lbl = "GATING" if is_gating else "STRUCTURAL"
     return (
         f'<span style="background:{bg};color:{clr};padding:2px 8px;'
-        f'border-radius:3px;font-weight:600;font-size:0.72rem;'
-        f'letter-spacing:0.07em;">{lbl}</span>'
+        f'border-radius:3px;font-weight:700;font-size:0.67rem;'
+        f'letter-spacing:0.09em;">{lbl}</span>'
     )
 
 
 def indicator_header(name: str, role: str, score_key: str,
                      score_label: str, colors: dict) -> None:
-    c1, c2 = st.columns([3, 2])
-    with c1:
-        st.markdown(
-            f"### {name} &nbsp; {role_chip_html(role)}",
-            unsafe_allow_html=True,
-        )
-    with c2:
-        st.markdown(
-            f'<div style="text-align:right;padding-top:14px;">'
-            f'{score_badge_html(score_key, score_label, colors)}</div>',
-            unsafe_allow_html=True,
-        )
+    color = colors.get(score_key, "#4A6B8A")
+    is_gating = "gating" in role.lower()
+    role_bg  = "#F5E8E8" if is_gating else "#E8F0E8"
+    role_clr = "#8B1515" if is_gating else "#1A5A30"
+    role_lbl = "GATING" if is_gating else "STRUCTURAL"
+    st.markdown(
+        f'<div style="background:#FBF7EF;border-left:4px solid {color};'
+        f'border-radius:0 10px 10px 0;padding:14px 20px 12px 20px;'
+        f'margin:20px 0 8px 0;box-shadow:0 1px 4px rgba(92,26,27,0.07);">'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;'
+        f'flex-wrap:wrap;gap:8px;">'
+        f'<div style="display:flex;align-items:center;gap:10px;">'
+        f'<span style="font-size:1.05rem;font-weight:700;color:#3A1010;'
+        f'font-family:Georgia,Cambria,serif;">{name}</span>'
+        f'<span style="background:{role_bg};color:{role_clr};padding:2px 8px;'
+        f'border-radius:3px;font-weight:700;font-size:0.67rem;letter-spacing:0.09em;">'
+        f'{role_lbl}</span>'
+        f'</div>'
+        f'<span style="background:{color}18;border:1.5px solid {color};color:{color};'
+        f'padding:4px 14px;border-radius:12px;font-weight:700;font-size:0.8rem;">'
+        f'{score_label}</span>'
+        f'</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def get_dp(indicator: dict, dp_id: str) -> dict:
@@ -259,6 +426,16 @@ elif section == "Part 2: Forward Framework":
         compute_ladder_verdict,
     )
     from src.wb_refresh import fetch_wgi, fetch_findex
+
+    # ── UI color overrides (display layer only; does not affect scoring logic) ─
+    _UI_COLORS: dict = {
+        "favorable":             "#1A6B3C",
+        "neutral_to_caution":    "#A06010",
+        "neutral":               "#4A6B8A",
+        "neutral_lean_negative": "#8A4010",
+        "at_risk_mild":          "#9C1A18",
+        "severe":                "#6B0A0A",
+    }
 
     # ── Threshold defaults ────────────────────────────────────────────────────
     _DEFAULTS: dict = {
@@ -547,7 +724,7 @@ elif section == "Part 2: Forward Framework":
 
     # ── Indicator 1: Valuation (Gating) ───────────────────────────────────────
     indicator_header(val_ind["name"], val_ind["role"],
-                     live_val["score"], live_val["score_display"], SCORE_COLORS)
+                     live_val["score"], live_val["score_display"], _UI_COLORS)
 
     inda_pe   = get_dp(val_ind, "inda_pe")
     msci_pe   = get_dp(val_ind, "msci_em_pe")
@@ -561,8 +738,8 @@ elif section == "Part 2: Forward Framework":
               help=f"Source: {inda_pe['source']} | As of {inda_pe['as_of']}")
     c2.metric("MSCI EM trailing P/E", f"{msci_pe['value']:.2f}x",
               help=f"Source: {msci_pe['source']} | As of {msci_pe['as_of']}")
-    c3.metric("India P/E premium to EM ex-India",
-              f"{prem_lo_pct:.1f}% to {prem_hi_pct:.1f}%",
+    c3.metric("P/E premium (India / EM)",
+              f"{prem_lo_pct:.1f}-{prem_hi_pct:.1f}%",
               help="Range across India weight assumptions 12% to 15%. Same ex-India construction as Layer 1.")
 
     with st.expander("Valuation bands (current thresholds)"):
@@ -602,7 +779,7 @@ elif section == "Part 2: Forward Framework":
 
     # ── Indicator 2: Demographics (Structural) ────────────────────────────────
     indicator_header(dem_ind["name"], dem_ind["role"],
-                     live_dem["score"], live_dem["score_display"], SCORE_COLORS)
+                     live_dem["score"], live_dem["score_display"], _UI_COLORS)
 
     old_ind = get_dp(dem_ind, "old_age_dep_india")
     old_chn = get_dp(dem_ind, "old_age_dep_china")
@@ -612,13 +789,13 @@ elif section == "Part 2: Forward Framework":
     tlfp    = get_dp(dem_ind, "total_lfp_india")
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("Old-age dependency",
-              f"India {old_ind['value']} vs China {old_chn['value']}",
+    c1.metric("Old-age dep. (India / China)",
+              f"{old_ind['value']} / {old_chn['value']}",
               delta="Less than half China's ratio (favorable)",
               delta_color="off",
               help=f"Source: {old_ind['source']} | As of {old_ind['as_of']}")
-    c2.metric("Total age dependency",
-              f"India {tot_ind['value']} vs China {tot_chn['value']}",
+    c2.metric("Total age dep. (India / China)",
+              f"{tot_ind['value']} / {tot_chn['value']}",
               help=f"Source: {tot_ind['source']} | As of {tot_ind['as_of']}")
     c3.metric("Female LFP: India", f"{flfp['value']}%",
               delta=f"Total LFP: {tlfp['value']}%",
@@ -642,7 +819,7 @@ elif section == "Part 2: Forward Framework":
 
     # ── Indicator 3: Governance (Structural) ──────────────────────────────────
     indicator_header(gov_ind["name"], gov_ind["role"],
-                     live_gov["score"], live_gov["score_display"], SCORE_COLORS)
+                     live_gov["score"], live_gov["score_display"], _UI_COLORS)
 
     # Build WGI table from live or pinned data
     if st.session_state["wgi_live"]:
@@ -671,8 +848,12 @@ elif section == "Part 2: Forward Framework":
         else:
             return "background-color:#4a1818;color:#f5c0c0"
 
-    styled_wgi = _apply_style(wgi_df.style, color_wgi_cell)
-    st.dataframe(styled_wgi, use_container_width=True)
+    # Show 2023 columns only (fits container without horizontal scroll)
+    _wgi_2023_cols = [c for c in wgi_df.columns if "2023" in str(c)]
+    wgi_2023 = wgi_df[_wgi_2023_cols] if _wgi_2023_cols else wgi_df
+    st.dataframe(_apply_style(wgi_2023.style, color_wgi_cell), use_container_width=True)
+    with st.expander("Full WGI history (2014, 2019, 2023)"):
+        st.dataframe(_apply_style(wgi_df.style, color_wgi_cell), use_container_width=True)
     years_str = ", ".join(str(y) for y in gov_ind["wgi_table"]["years"])
     st.caption(
         f"{gov_ind['wgi_table']['scale']}. "
@@ -694,7 +875,7 @@ elif section == "Part 2: Forward Framework":
 
     # ── Indicator 4: Digital Financial Adoption (Structural) ──────────────────
     indicator_header(dig_ind["name"], dig_ind["role"],
-                     live_dig["score"], live_dig["score_display"], SCORE_COLORS)
+                     live_dig["score"], live_dig["score_display"], _UI_COLORS)
 
     # Resolve display values (live or pinned)
     if _fl:
@@ -716,12 +897,12 @@ elif section == "Part 2: Forward Framework":
     _gap_mch = _d_peer_merch - _d_india_merch
 
     c1, c2 = st.columns(2)
-    c1.metric("Any digital payment: India vs EM peer median",
-              f"{_d_india_any}% vs {_d_peer_any}%",
+    c1.metric("Any digital pay. (India / EM median)",
+              f"{_d_india_any}% / {_d_peer_any}%",
               delta=f"India trails by {_gap_any:.1f}pp",
               delta_color="inverse")
-    c2.metric("Digital merchant payment: India vs EM peer median",
-              f"{_d_india_merch}% vs {_d_peer_merch}%",
+    c2.metric("Merchant payments (India / EM median)",
+              f"{_d_india_merch}% / {_d_peer_merch}%",
               delta=f"India trails by {_gap_mch:.1f}pp",
               delta_color="inverse")
 
@@ -761,14 +942,15 @@ elif section == "Part 2: Forward Framework":
 
     # ── Indicator 5: External Macro Vulnerability (Gating) ────────────────────
     indicator_header(ext_ind["name"], ext_ind["role"],
-                     live_ext["score"], live_ext["score_display"], SCORE_COLORS)
+                     live_ext["score"], live_ext["score_display"], _UI_COLORS)
 
     inr_drag  = get_dp(ext_ind, "inr_depreciation_rate")
     oil_share = get_dp(ext_ind, "oil_import_share")
     inr_corr  = get_dp(ext_ind, "inda_inr_correlation")
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("INR depreciation vs USD", inr_drag["value"],
+    c1.metric("INR depreciation vs USD",
+              inr_drag["value"].replace("per year", "/yr"),
               help=f"Source: {inr_drag['source']} | As of {inr_drag['as_of']}")
     c2.metric("Oil share of import bill",
               oil_share["value"].replace("approximately ", "~"),
@@ -815,15 +997,45 @@ elif section == "Part 2: Forward Framework":
         for k, v in live_scores.items()
     ])
 
-    _disp_to_color = {sd: SCORE_COLORS.get(sk, "#8FA3B1") for sk, sd in SCORE_ICONS.items()}
-    _disp_to_color["Neutral (negative level, positive trend)"] = SCORE_COLORS["neutral"]
-
-    def _style_score(v):
-        color = _disp_to_color.get(str(v), "#8FA3B1")
-        return f"background-color:{color}28;color:{color};font-weight:600"
-
-    styled_summary = _apply_style(summary_df.style, _style_score, subset=["score"])
-    st.dataframe(styled_summary, use_container_width=True, hide_index=True)
+    # HTML table replaces st.dataframe here so score labels never clip
+    _sum_rows = ""
+    for _, row in summary_df.iterrows():
+        score_key_lookup = next(
+            (k for k, v in live_scores.items() if v["score_display"] == row["score"]),
+            None,
+        )
+        _c = _UI_COLORS.get(
+            live_scores[score_key_lookup]["score"] if score_key_lookup else "neutral",
+            "#4A6B8A",
+        )
+        _sum_rows += (
+            f'<tr style="border-top:1px solid #E8DEC8;">'
+            f'<td style="padding:9px 14px;font-weight:600;color:#2C1A0E;">'
+            f'{row["indicator"]}</td>'
+            f'<td style="padding:9px 14px;color:#8A7B6B;font-size:0.85rem;">'
+            f'{row["role"]}</td>'
+            f'<td style="padding:9px 14px;">'
+            f'<span style="background:{_c}28;border:1.5px solid {_c};color:{_c};'
+            f'padding:3px 11px;border-radius:10px;font-weight:700;font-size:0.8rem;'
+            f'white-space:normal;">{row["score"]}</span></td>'
+            f'</tr>'
+        )
+    st.markdown(
+        f'<div style="border:1px solid #D8C8A8;border-radius:10px;overflow:hidden;'
+        f'box-shadow:0 1px 4px rgba(92,26,27,0.07);">'
+        f'<table style="width:100%;border-collapse:collapse;background:#FBF7EF;">'
+        f'<thead><tr style="background:#F0E8D8;">'
+        f'<th style="padding:10px 14px;text-align:left;color:#8A7B6B;font-size:0.72rem;'
+        f'text-transform:uppercase;letter-spacing:0.07em;font-weight:700;">Indicator</th>'
+        f'<th style="padding:10px 14px;text-align:left;color:#8A7B6B;font-size:0.72rem;'
+        f'text-transform:uppercase;letter-spacing:0.07em;font-weight:700;">Role</th>'
+        f'<th style="padding:10px 14px;text-align:left;color:#8A7B6B;font-size:0.72rem;'
+        f'text-transform:uppercase;letter-spacing:0.07em;font-weight:700;">Score</th>'
+        f'</tr></thead>'
+        f'<tbody>{_sum_rows}</tbody>'
+        f'</table></div>',
+        unsafe_allow_html=True,
+    )
 
     # ── Download button ───────────────────────────────────────────────────────
     _thresh_labels = {
@@ -886,40 +1098,42 @@ elif section == "Part 2: Forward Framework":
     rung = live_verdict["rung"]
 
     _rung_styles = {
-        1: ("#1e3a2c", "#2D9E6B", "#7ecfa8"),
-        2: ("#3a2e1a", "#C9A84C", "#e8c87a"),
-        3: ("#1e3a5c", "#5B8DB8", "#a8c8e8"),
-        4: ("#3a1a1a", "#E05C5C", "#f0a0a0"),
+        1: ("#0E2818", "#1A6B3C", "#5CD898"),
+        2: ("#2A1608", "#A06010", "#E8A840"),
+        3: ("#081A20", "#1A7070", "#5CC4C0"),
+        4: ("#250808", "#9C1A18", "#F09090"),
     }
 
     for r_num, r_label in RUNG_LABELS.items():
         active = r_num == rung
         if active:
             bg, border, clr = _rung_styles[r_num]
-            weight, arrow = "700", "   << CURRENT VERDICT"
+            weight, arrow = "700", "  < current verdict"
             color_css = f"color:{clr};"
         else:
-            bg, border = "#111827", "#2a3a4a"
-            weight, arrow, color_css = "400", "", ""
+            bg, border = "#1E0E0E", "#3A1818"
+            weight, arrow, color_css = "400", "", "color:#A07060;"
         st.markdown(
             f'<div style="background:{bg};border:2px solid {border};border-radius:6px;'
-            f'padding:10px 18px;margin:3px 0;font-weight:{weight};{color_css}">'
-            f'<span style="opacity:0.55;">Rung {r_num}:</span> {r_label}{arrow}</div>',
+            f'padding:11px 18px;margin:3px 0;font-weight:{weight};{color_css}">'
+            f'<span style="opacity:0.45;font-size:0.78rem;letter-spacing:0.05em;">'
+            f'RUNG {r_num}</span>'
+            f'<span style="margin-left:10px;">{r_label}</span>'
+            f'<span style="font-size:0.78rem;opacity:0.7;margin-left:6px;">{arrow}</span>'
+            f'</div>',
             unsafe_allow_html=True,
         )
-
-    st.markdown("&nbsp;", unsafe_allow_html=True)
 
     _vbg, _vborder, _vtxt = _rung_styles[rung]
     st.markdown(
         f'<div style="background:{_vbg};border:2px solid {_vborder};color:{_vtxt};'
-        f'padding:16px 28px;border-radius:8px;font-size:1.3rem;font-weight:700;'
-        f'text-align:center;letter-spacing:0.04em;">'
+        f'margin-top:10px;padding:18px 28px;border-radius:10px;font-size:1.25rem;font-weight:800;'
+        f'font-family:Georgia,Cambria,serif;'
+        f'text-align:center;letter-spacing:0.05em;'
+        f'box-shadow:0 2px 10px rgba(92,26,27,0.25);">'
         f'RUNG {rung}: {RUNG_LABELS[rung].upper()}</div>',
         unsafe_allow_html=True,
     )
-
-    st.markdown("&nbsp;", unsafe_allow_html=True)
 
     st.markdown(f"**Derivation:** {live_verdict['derivation']}")
     st.markdown(f"**Declared verdict:** {pinned['verdict_statement']}")

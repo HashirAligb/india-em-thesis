@@ -23,17 +23,18 @@ from src.data_engine import (
     compute_verdict,
 )
 
-# ── Colour palette ──────────────────────────────────────────────────────────
-NAVY  = "#0D1B2A"
-GOLD  = "#C9A84C"
-RED   = "#E05C5C"
-GREEN = "#2D9E6B"
-SLATE = "#8FA3B1"
-WHITE = "#F4F6F9"
-TEAL  = "#1A7FA1"
+# ── Colour palette (warm cream/burgundy to match app) ────────────────────────
+NAVY  = "#F6F0E2"   # page background (cream) -- used as fig/ax facecolor
+GOLD  = "#B07820"   # INDA series -- warm amber, readable on cream
+RED   = "#9C1A18"   # FXI series -- burgundy red
+GREEN = "#1A6B3C"   # SUPPORTED verdict
+SLATE = "#8A7B6B"   # muted labels, axes, spines
+WHITE = "#2C1A0E"   # primary text (dark on cream)
+TEAL  = "#1A7070"   # EM ex-India series
 
 # One consistent colour per ticker so every chart reads the same legend
 TICKER_COLORS = {"INDA": GOLD, "EEM_exIndia": TEAL, "FXI": RED}
+
 TICKER_LABELS = {"INDA": "INDA", "EEM_exIndia": "EM ex-India", "FXI": "FXI"}
 
 # Where the PNGs go — resolved relative to this file so it works regardless
