@@ -6,6 +6,8 @@ Part 2: Layer 2 forward-durability framework (interactive threshold explorer).
 Run: streamlit run app.py
 """
 
+import datetime
+import io
 import os
 import sys
 import pandas as pd
@@ -22,10 +24,11 @@ st.set_page_config(
 )
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-ROOT        = os.path.dirname(__file__)
-DATA_DIR    = os.path.join(ROOT, "data")
-FIGURES_DIR = os.path.join(ROOT, "outputs", "figures")
-L1_CSV      = os.path.join(DATA_DIR, "layer1_summary.csv")
+ROOT          = os.path.dirname(__file__)
+DATA_DIR      = os.path.join(ROOT, "data")
+FIGURES_DIR   = os.path.join(ROOT, "outputs", "figures")
+L1_CSV        = os.path.join(DATA_DIR, "layer1_summary.csv")
+L1_CORR_CSV   = os.path.join(DATA_DIR, "layer1_rolling_corr.csv")
 
 # ── Sidebar nav ───────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -197,7 +200,35 @@ FXI: **{fxi['sharpe_style']:.3f}**.
 
     st.divider()
 
-    # ── Charts ────────────────────────────────────────────────────────────────
+    # ── Interactive: Rolling 12-Month Correlation ─────────────────────────────
+    st.subheader("Rolling 12-Month Correlation (Interactive)")
+    try:
+        corr_df = pd.read_csv(L1_CORR_CSV, index_col="date", parse_dates=True)
+        corr_df = corr_df.rename(columns={
+            "INDA_EEM_exIndia": "INDA vs EM ex-India",
+            "INDA_INR":         "INDA vs INR (USD/INR spot)",
+        })
+        st.line_chart(corr_df, use_container_width=True)
+        st.caption(
+            "Rolling 252-trading-day correlation. "
+            "EM ex-India benchmark: India's contribution removed at fixed ~15% weight "
+            "(same construction as the Layer 1 return benchmark). "
+            "Window: 2014-01-16 to 2026-06-25 (pinned; first 252 days consumed by the rolling window). "
+            "Near-zero INDA/INR correlation over the full window confirms the persistent "
+            "currency drag has historically been absorbed by India's equity returns. "
+            "Note: the Notable Finding (~0.76 average correlation) is INDA vs raw EEM, "
+            "not INDA vs EM ex-India; the ex-India series averages ~0.61 over the same window."
+        )
+    except FileNotFoundError:
+        st.warning(
+            "layer1_rolling_corr.csv not found in data/. "
+            "Showing the static chart below. "
+            "Run the pin script in the project scratchpad to regenerate."
+        )
+
+    st.divider()
+
+    # ── Static Charts ─────────────────────────────────────────────────────────
     st.subheader("Charts")
 
     chart_files = [
@@ -793,6 +824,59 @@ elif section == "Part 2: Forward Framework":
 
     styled_summary = _apply_style(summary_df.style, _style_score, subset=["score"])
     st.dataframe(styled_summary, use_container_width=True, hide_index=True)
+
+    # ── Download button ───────────────────────────────────────────────────────
+    _thresh_labels = {
+        "th_val_caution":  "Valuation Neutral/Caution split (%)",
+        "th_val_atrisk":   "Valuation Caution/At-risk split (%)",
+        "th_val_severe":   "Valuation At-risk/Severe split (%)",
+        "th_gov_count":    "Governance Lean-Neg threshold (dims below 0)",
+        "th_dig_gap":      "Digital adoption large-gap threshold (pp)",
+        "th_dem_ratio":    "Demographics old-age ratio ceiling (%)",
+        "th_ext_inr_mild": "External macro INR mild threshold (%/yr)",
+        "th_ext_inr_sev":  "External macro INR severe threshold (%/yr)",
+        "th_ext_oil_mild": "External macro oil mild threshold (%)",
+        "th_ext_oil_sev":  "External macro oil severe threshold (%)",
+    }
+
+    def _build_export_csv() -> str:
+        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+        thresh_status = "non-default thresholds active" if off_default else "pre-declared defaults"
+        data_status   = "live World Bank API" if off_live else "pinned mid-2026 dataset"
+        lines = [
+            f"# India EM Thesis -- Layer 2 Framework State Export ({ts})",
+            f"# Threshold status: {thresh_status}",
+            f"# Data source: {data_status}",
+            "",
+            "INDICATOR SCORES",
+            "Indicator,Role,Score",
+        ]
+        for k, v in live_scores.items():
+            name, role = _label_map[k]
+            lines.append(f"{name},{role},{v['score_display']}")
+        lines += [
+            "",
+            "THRESHOLD VALUES",
+            "Threshold,Pre-declared Default,Current Value,Off-Default",
+        ]
+        for k, default_val in _DEFAULTS.items():
+            current_val = st.session_state.get(k, default_val)
+            off = "Yes" if current_val != default_val else "No"
+            label = _thresh_labels.get(k, k)
+            lines.append(f"{label},{default_val},{current_val},{off}")
+        return "\n".join(lines)
+
+    _export_fname = (
+        f"india_em_framework_"
+        f"{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d')}.csv"
+    )
+    st.download_button(
+        label="Download framework state (CSV)",
+        data=_build_export_csv(),
+        file_name=_export_fname,
+        mime="text/csv",
+        help="Exports all five indicator scores and the current threshold values to a CSV file.",
+    )
 
     st.divider()
 
