@@ -68,8 +68,8 @@ Tracks key analytical and methodological choices made during the research proces
 ---
 
 ### [2026-06-17] Risk-Adjusted Metric Added to Verdict
-**Decision**: The verdict will use a risk-adjusted measure (annualised return ÷ annualised volatility, a Sharpe-style ratio with 0% risk-free rate) alongside cumulative return, not cumulative return alone.
-**Rationale**: The thesis statement tests "risk-adjusted USD returns," but the original verdict logic only checked which ETF ended highest. Volatility and max drawdown were computed and charted but not fed into the verdict — they sat beside the decision rather than inside it. Adding return ÷ volatility makes the verdict actually reflect the risk dimension the thesis claims to measure: India ending highest is not the same as India being the best deal once the volatility of the ride is accounted for.
+**Decision**: The verdict will use a risk-adjusted measure (annualised return / annualised volatility, a Sharpe-style ratio with 0% risk-free rate) alongside cumulative return, not cumulative return alone.
+**Rationale**: The thesis statement tests "risk-adjusted USD returns," but the original verdict logic only checked which ETF ended highest. Volatility and max drawdown were computed and charted but not fed into the verdict — they sat beside the decision rather than inside it. Adding return / volatility makes the verdict actually reflect the risk dimension the thesis claims to measure: India ending highest is not the same as India being the best deal once the volatility of the ride is accounted for.
 **Alternatives considered**: Cumulative return only; rejected because it fails to operationalise the risk-adjusted language in the thesis statement. Full Sharpe ratio with a non-zero risk-free rate; rejected in favour of a 0% floor for simplicity and cross-window comparability.
 **Source**: Surfaced during a red-team review of my methodology, June 17.
 
@@ -133,3 +133,75 @@ Tracks key analytical and methodological choices made during the research proces
 - [ ] Is the demographic dividend argument already priced in at current Nifty valuations?
 - [ ] How to weight the China+1 supply chain argument given Vietnam and Mexico are also beneficiaries?
 - [ ] Should forward P/E be used if trailing P/E data is unavailable via free APIs?
+
+---
+
+## Layer 2 Framework Decisions
+
+### [2026-07-06] Indicator selection
+
+**What:** The framework scores five indicators: valuation, demographics, governance, digital financial adoption, and external macro vulnerability. An earlier candidate list also included historical EM correlation, FDI trends, geopolitical tailwinds, and earnings growth premium.
+
+**Why:** I applied three criteria to trim the list. The indicator had to be directly measurable from a publicly available source. It had to be relevant to the forward-durability question specifically, not a restatement of what Layer 1 already measured. And the underlying data had to be collectible without paid data access. Governance cleared all three on World Bank WGI. EM correlation failed the second criterion -- it describes past behavior, not forward conditions. Earnings growth premium failed the third. Geopolitical tailwinds failed the first.
+
+**What changed:** Went in with a longer wishlist, came out with five. The framework is narrower than an ideal paid-data version would be; the framework limitations section says so explicitly.
+
+---
+
+### [2026-07-06] Governance chosen over EM correlation
+
+**What:** Governance (World Bank WGI) filled the fifth indicator slot. Historical INDA-EEM rolling correlation was the main alternative.
+
+**Why:** Correlation is a Layer 1 metric. It measures how India has moved relative to the EM herd historically. I already report it in the Layer 1 Notable Finding (~0.76 over the full window). Putting it back into Layer 2 as a durability signal would re-present a historical fact as a forward-looking assessment. Governance is genuinely structural: weak rule of law and corruption affect the reliability of earnings and capital returns going forward, regardless of what the return series looked like over 2013-2026.
+
+**What changed:** Correlation stays in Layer 1 where it belongs. Governance goes into Layer 2. No double-counting.
+
+---
+
+### [2026-07-06] Geopolitical tailwinds dropped
+
+**What:** The "China+1 supply chain beneficiary" and "geopolitical realignment" arguments were considered as a structural indicator and then cut from the framework.
+
+**Why:** No defensible metric. The supply-chain argument is real -- India is capturing some manufacturing shift from China -- but there is no publicly available, comparable, and updatable time-series that isolates India's supply-chain capture in a form that can be scored with a pre-declared threshold. FDI inflows exist but reflect too many confounding factors. Including it as an unscored positive would add narrative without analytical weight and would make the framework asymmetric in a way I could not justify.
+
+**What changed:** Geopolitical tailwinds are acknowledged in the framework context but not scored. The framework limitations section flags this as a known gap in the bull-case coverage.
+
+---
+
+### [2026-07-06] Currency and oil merged into one external-macro indicator
+
+**What:** An earlier version of the framework had INR depreciation and oil exposure as two separate gating indicators. They were merged into a single external macro vulnerability indicator.
+
+**Why:** These are the same underlying risk, not two separate ones. An oil shock raises the import bill, widens the current account deficit, pressures the rupee, and amplifies the drag on USD-denominated returns -- in that causal chain. Scoring them separately gave the same vulnerability double weight in the ladder. The merge was a double-count fix. The combined indicator still captures both sub-signals: INR depreciation has its own mild and severe thresholds, and so does oil's share of imports.
+
+**What changed:** Two indicators became one. The ladder weighting is more honest as a result.
+
+---
+
+### [2026-07-06] Digital adoption added to test the bull pillar; neutral score kept
+
+**What:** Digital financial adoption (World Bank Findex, g20.any and merchant.pay) was added specifically to test the "digital infrastructure leader" pillar of the original thesis. Findex 2024 shows India at 48% on any digital payment against an EM peer median of 71%. The score is Neutral.
+
+**Why:** The original thesis framed India's digital infrastructure as a competitive strength and a driver of the next decade of growth. The data says India is converging from behind, not leading. The trend is real and fast (22% in 2014 to 48% in 2024), but the absolute level is 23pp below the EM peer median. The merchant-payment rate (18% vs a peer median of 51%) shows the gap is largest exactly where it matters most for listed-company revenues. I kept the Neutral score rather than adjusting it upward to fit the original narrative.
+
+**What changed:** The indicator disconfirmed the strong form of the bull claim. The Neutral score stays. The framework notes this honestly: India's digital story is real and accelerating, but it is a convergence-from-behind story, not established EM leadership.
+
+---
+
+### [2026-07-06] Framework red team: fixed the real error, disclosed the rest
+
+**What:** Before locking the thresholds, I red-teamed the framework to catch scoring bias and coverage gaps. Two outputs: a correction to the demographics score (addition of the female LFP conversion caveat), and an explicit framework limitations section covering the coverage asymmetry.
+
+**Why:** The demographics indicator was initially framed as a clean Favorable. The red team flagged that female labor force participation at 35% means the demographic dividend is only partially realized. That is a real analytical caveat, not a minor footnote. It changes the interpretation of the score: Favorable means the age structure is genuinely advantageous, but the conversion into economic output depends on participation rising. I added the caveat to the score display and the rationale rather than ignoring it. The coverage asymmetry -- that the framework measures the risk side (valuation, external macro) more completely than the structural-opportunity side (geopolitical tailwinds absent, earnings bridge absent) -- cannot be fixed without paid data. So it is disclosed rather than minimized.
+
+**What changed:** Demographics kept Favorable but gained an explicit conversion caveat. The framework limitations section was added. Digital adoption's Neutral score was confirmed as the correct read, not adjusted.
+
+---
+
+### [2026-07-15] Scoring made adjustable via the Threshold Explorer
+
+**What:** The five indicator scores and the confidence ladder verdict are computed live from the threshold parameters, which are exposed as slider controls in the app sidebar under "Threshold Explorer." A "Reset to pre-declared thresholds" button restores the declared Rung 3 state. When any slider differs from the default, a warning banner appears explaining the user is in exploration mode.
+
+**Why:** Pre-declared thresholds are a methodological commitment, but a second analyst should be able to test whether the verdict is robust to different assumptions. Moving the valuation Neutral/Caution split from 20% to 25% changes whether the ~24% premium scores as Neutral or Caution. Changing the governance Lean-Negative count from four below-zero dimensions to three changes the governance score. Making those sensitivity tests interactive does not change the declared verdict; it makes the declared verdict more defensible because its robustness (or lack of it) is visible.
+
+**What changed:** Scoring functions were refactored from hardcoded strings into parameterised functions in src/layer2.py -- `score_valuation`, `score_demographics`, `score_governance`, `score_digital_adoption`, `score_external_macro`, and `compute_ladder_verdict` -- with defaults matching the pre-declared values. The Streamlit app manages threshold state in session_state and reruns all scoring functions on every slider change. Assertion tests in src/layer2.py verify that the defaults reproduce the locked Rung 3 verdict.
