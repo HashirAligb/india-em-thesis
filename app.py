@@ -1,7 +1,7 @@
 """
 Silver-tier Streamlit app.
 Part 1: Layer 1 historical analysis.
-Part 2: Layer 2 forward-durability framework.
+Part 2: Layer 2 forward-durability framework (interactive threshold explorer).
 
 Run: streamlit run app.py
 """
@@ -221,19 +221,283 @@ FXI: **{fxi['sharpe_style']:.3f}**.
 elif section == "Part 2: Forward Framework":
     from src.layer2 import (
         load_indicators, get_indicator, get_ladder_verdict,
-        governance_as_dataframe, digital_peer_table, scoring_summary,
-        SCORE_COLORS,
+        governance_as_dataframe, digital_peer_table,
+        SCORE_COLORS, SCORE_ICONS, RUNG_LABELS,
+        score_valuation, score_demographics, score_governance,
+        score_digital_adoption, score_external_macro,
+        compute_ladder_verdict,
+    )
+    from src.wb_refresh import fetch_wgi, fetch_findex
+
+    # ── Threshold defaults ────────────────────────────────────────────────────
+    _DEFAULTS: dict = {
+        "th_val_caution":  20,
+        "th_val_atrisk":   30,
+        "th_val_severe":   40,
+        "th_gov_count":    4,
+        "th_dig_gap":      20,
+        "th_dem_ratio":    60,
+        "th_ext_inr_mild": 2.0,
+        "th_ext_inr_sev":  8.0,
+        "th_ext_oil_mild": 15,
+        "th_ext_oil_sev":  45,
+    }
+    for _k, _v in _DEFAULTS.items():
+        if _k not in st.session_state:
+            st.session_state[_k] = _v
+
+    # ── Refresh state ─────────────────────────────────────────────────────────
+    for _rk in ("wgi_live", "findex_live", "wgi_error", "findex_error"):
+        if _rk not in st.session_state:
+            st.session_state[_rk] = None
+
+    # ── Callbacks ─────────────────────────────────────────────────────────────
+    def _reset_thresholds() -> None:
+        for _k, _v in _DEFAULTS.items():
+            st.session_state[_k] = _v
+
+    def _do_refresh_wgi() -> None:
+        result = fetch_wgi()
+        if result is not None:
+            st.session_state["wgi_live"]  = result
+            st.session_state["wgi_error"] = None
+        else:
+            st.session_state["wgi_error"] = (
+                "WGI refresh failed. World Bank API may be unavailable or slow. "
+                "Pinned data is still shown."
+            )
+
+    def _do_refresh_findex() -> None:
+        result = fetch_findex()
+        if result is not None:
+            st.session_state["findex_live"]  = result
+            st.session_state["findex_error"] = None
+        else:
+            st.session_state["findex_error"] = (
+                "Findex refresh failed. World Bank API may be unavailable or slow. "
+                "Pinned data is still shown."
+            )
+
+    def _revert_to_pinned() -> None:
+        st.session_state["wgi_live"]    = None
+        st.session_state["findex_live"] = None
+        st.session_state["wgi_error"]   = None
+        st.session_state["findex_error"] = None
+
+    # ── Sidebar ───────────────────────────────────────────────────────────────
+    with st.sidebar:
+        st.divider()
+        st.markdown("**Threshold Explorer**")
+        _off_thresh = any(
+            st.session_state.get(_k) != _v for _k, _v in _DEFAULTS.items()
+        )
+        if _off_thresh:
+            st.caption(
+                "Non-default thresholds active. "
+                "Declared verdict uses the pre-declared defaults."
+            )
+        st.button("Reset to pre-declared thresholds", on_click=_reset_thresholds)
+
+        st.markdown("*Valuation bands*")
+        st.slider("Neutral / Caution split (pre-declared: 20%)",
+                  10, 35, step=5, format="%d%%", key="th_val_caution")
+        st.slider("Caution / At-risk split (pre-declared: 30%)",
+                  20, 50, step=5, format="%d%%", key="th_val_atrisk")
+        st.slider("At-risk / Severe split (pre-declared: 40%)",
+                  30, 60, step=5, format="%d%%", key="th_val_severe")
+
+        st.markdown("*Governance*")
+        st.slider("Lean-Negative if N+ dims below zero (pre-declared: 4)",
+                  2, 6, step=1, key="th_gov_count")
+
+        st.markdown("*Digital adoption*")
+        st.slider("Peer-gap threshold for large lag (pre-declared: 20pp)",
+                  5, 35, step=5, format="%dpp", key="th_dig_gap")
+
+        st.markdown("*Demographics*")
+        st.slider("Old-age dep ratio ceiling for Favorable (pre-declared: 60%)",
+                  35, 85, step=5, format="%d%%", key="th_dem_ratio")
+
+        st.markdown("*External macro*")
+        st.slider("INR mild threshold (pre-declared: 2.0%/yr)",
+                  0.5, 5.0, step=0.5, format="%.1f%%", key="th_ext_inr_mild")
+        st.slider("INR severe threshold (pre-declared: 8.0%/yr)",
+                  5.0, 15.0, step=1.0, format="%.1f%%", key="th_ext_inr_sev")
+        st.slider("Oil mild threshold (pre-declared: 15%)",
+                  5, 25, step=5, format="%d%%", key="th_ext_oil_mild")
+        st.slider("Oil severe threshold (pre-declared: 45%)",
+                  30, 60, step=5, format="%d%%", key="th_ext_oil_sev")
+
+        st.divider()
+        st.markdown("**Live Data Refresh**")
+        st.caption(
+            "Default: pinned mid-2026 dataset. "
+            "Refresh to pull current World Bank figures. "
+            "WGI takes ~10 s (6 sequential API calls)."
+        )
+
+        _ca, _cb = st.columns(2)
+        _ca.button("Refresh WGI", on_click=_do_refresh_wgi,
+                   help="Pull live World Bank Governance Indicators")
+        _cb.button("Refresh Findex", on_click=_do_refresh_findex,
+                   help="Pull live World Bank Global Findex 2024")
+
+        _wgi_ts    = (st.session_state["wgi_live"]    or {}).get("fetched_at")
+        _findex_ts = (st.session_state["findex_live"] or {}).get("fetched_at")
+
+        if st.session_state["wgi_error"]:
+            st.error(st.session_state["wgi_error"])
+        elif _wgi_ts:
+            st.caption(f"WGI: live ({_wgi_ts[:16]} UTC)")
+        else:
+            st.caption("WGI: pinned")
+
+        if st.session_state["findex_error"]:
+            st.error(st.session_state["findex_error"])
+        elif _findex_ts:
+            st.caption(f"Findex: live ({_findex_ts[:16]} UTC)")
+        else:
+            st.caption("Findex: pinned")
+
+        _any_live = bool(st.session_state["wgi_live"] or st.session_state["findex_live"])
+        if _any_live:
+            st.button("Revert to pinned data", on_click=_revert_to_pinned)
+
+    # ── Load pinned data ──────────────────────────────────────────────────────
+    data    = load_indicators()
+    val_ind = get_indicator(data, "valuation")
+    dem_ind = get_indicator(data, "demographics")
+    gov_ind = get_indicator(data, "governance")
+    dig_ind = get_indicator(data, "digital_adoption")
+    ext_ind = get_indicator(data, "external_macro")
+    pinned  = get_ladder_verdict(data)
+
+    # ── Resolve data sources (live if refreshed, else pinned) ─────────────────
+    # WGI governance dimensions for scoring
+    if st.session_state["wgi_live"]:
+        _india_23 = {
+            dim["name"]: dim["india"]["2023"]
+            for dim in st.session_state["wgi_live"]["dimensions"]
+        }
+    else:
+        _india_23 = {
+            d["name"]: d["india"]["2023"]
+            for d in gov_ind["wgi_table"]["dimensions"]
+        }
+
+    # Findex values for scoring
+    if st.session_state["findex_live"]:
+        _fl = st.session_state["findex_live"]
+        _india_any = _fl["india_any"]
+        _peer_any  = _fl["peer_median_any"]
+    else:
+        _fl = None
+        _india_any = next(
+            dp["value"] for dp in dig_ind["data_points"]
+            if dp["id"] == "india_any_dig_2024"
+        )
+        _peer_any = next(
+            dp["value"] for dp in dig_ind["data_points"]
+            if dp["id"] == "peer_median_any_dig_2024"
+        )
+
+    # Pinned data values used in panels (unchanged by live refresh)
+    _prem    = next(dp["value"] for dp in val_ind["data_points"] if dp["id"] == "premium_w13")
+    _dem_dp  = {dp["id"]: dp["value"] for dp in dem_ind["data_points"]}
+
+    # ── Live scoring from slider thresholds ───────────────────────────────────
+    def _build_val_bands(caution_pct: int, atrisk_pct: int, severe_pct: int) -> list:
+        c = caution_pct / 100
+        a = max(atrisk_pct / 100, c + 0.05)
+        s = max(severe_pct / 100, a + 0.05)
+        return [
+            {"label": "Favorable",          "range_low": 0.0,  "range_high": 0.10},
+            {"label": "Neutral",             "range_low": 0.10, "range_high": c},
+            {"label": "Caution",             "range_low": c,    "range_high": a},
+            {"label": "At-risk",             "range_low": a,    "range_high": s},
+            {"label": "Severe (gate trips)", "range_low": s,    "range_high": None},
+        ]
+
+    _live_bands = _build_val_bands(
+        st.session_state["th_val_caution"],
+        st.session_state["th_val_atrisk"],
+        st.session_state["th_val_severe"],
     )
 
-    data   = load_indicators()
-    ladder = get_ladder_verdict(data)
+    live_val = score_valuation(premium=_prem, bands=_live_bands)
+    live_dem = score_demographics(
+        old_age_dep_india=_dem_dp["old_age_dep_india"],
+        old_age_dep_china=_dem_dp["old_age_dep_china"],
+        female_lfp_pct=_dem_dp["female_lfp_india"],
+        max_ratio_for_favorable=st.session_state["th_dem_ratio"] / 100,
+    )
+    live_gov = score_governance(
+        india_scores_2023=_india_23,
+        neutral_neg_threshold=st.session_state["th_gov_count"],
+    )
+    live_dig = score_digital_adoption(
+        india_pct=_india_any,
+        peer_median_pct=_peer_any,
+        trend_direction="up",
+        large_gap=float(st.session_state["th_dig_gap"]),
+    )
+    live_ext = score_external_macro(
+        inr_dep_pct=3.5,
+        oil_share_pct=25.0,
+        inr_mild_threshold=st.session_state["th_ext_inr_mild"],
+        oil_mild_threshold=float(st.session_state["th_ext_oil_mild"]),
+        inr_severe_threshold=st.session_state["th_ext_inr_sev"],
+        oil_severe_threshold=float(st.session_state["th_ext_oil_sev"]),
+    )
 
+    live_scores  = {
+        "valuation":        live_val,
+        "demographics":     live_dem,
+        "governance":       live_gov,
+        "digital_adoption": live_dig,
+        "external_macro":   live_ext,
+    }
+    live_verdict = compute_ladder_verdict(live_scores)
+
+    off_default = any(st.session_state.get(_k) != _v for _k, _v in _DEFAULTS.items())
+    off_live    = bool(st.session_state["wgi_live"] or st.session_state["findex_live"])
+
+    # ── Helper: data source tag ───────────────────────────────────────────────
+    def _src_tag(kind: str) -> str:
+        """Return a short inline label showing whether data is live or pinned."""
+        ts = (st.session_state[f"{kind}_live"] or {}).get("fetched_at", "")
+        if ts:
+            return f"Live (World Bank API, {ts[:10]})"
+        return "Pinned (mid-2026 dataset)"
+
+    # ── Page header ───────────────────────────────────────────────────────────
     st.header("Layer 2: Forward-Durability Framework")
     st.caption(
         "Forward question: Layer 1 established historical outperformance. "
         "Layer 2 tests whether that outperformance is durable going forward, "
-        "or already priced in. Source: pinned mid-2026 dataset (see sidebar note)."
+        "or already priced in. Source: pinned mid-2026 dataset (see sidebar)."
     )
+
+    if off_default:
+        st.warning(
+            "Threshold Explorer is active: one or more thresholds differ from the "
+            "pre-declared defaults. Scores, summary, and verdict below reflect your "
+            "current settings. The declared Rung 3 verdict uses the pre-declared defaults "
+            "(reset via the sidebar button)."
+        )
+
+    if off_live:
+        _live_parts = []
+        if st.session_state["wgi_live"]:
+            _live_parts.append(f"WGI governance (fetched {_wgi_ts[:16]} UTC)")
+        if st.session_state["findex_live"]:
+            _live_parts.append(f"Findex digital (fetched {_findex_ts[:16]} UTC)")
+        st.info(
+            "Live data active: "
+            + " | ".join(_live_parts)
+            + ". Scores and verdict below reflect the live figures. "
+            "Values shown may differ from the pinned dataset."
+        )
 
     st.markdown(
         "Layer 1 established that India outperformed EM ex-India and China across "
@@ -243,121 +507,126 @@ elif section == "Part 2: Forward Framework":
         "The framework scores **five indicators** against pre-declared thresholds: "
         "**three structural** (do the fundamentals support durable outperformance?) "
         "and **two gating** (can external constraints cap the verdict?). "
-        "A confidence ladder, not a vote count, determines the final verdict."
+        "A confidence ladder, not a vote count, determines the final verdict. "
+        "Use the Threshold Explorer in the sidebar to test alternative scoring assumptions "
+        "or refresh WGI and Findex to pull current World Bank data."
     )
 
     st.divider()
 
     # ── Indicator 1: Valuation (Gating) ───────────────────────────────────────
-    val = get_indicator(data, "valuation")
-    indicator_header(val["name"], val["role"], val["score"], val["score_display"], SCORE_COLORS)
+    indicator_header(val_ind["name"], val_ind["role"],
+                     live_val["score"], live_val["score_display"], SCORE_COLORS)
 
-    inda_pe   = get_dp(val, "inda_pe")
-    msci_pe   = get_dp(val, "msci_em_pe")
-    prem_low  = get_dp(val, "premium_w12")
-    prem_high = get_dp(val, "premium_w15")
-
+    inda_pe   = get_dp(val_ind, "inda_pe")
+    msci_pe   = get_dp(val_ind, "msci_em_pe")
+    prem_low  = get_dp(val_ind, "premium_w12")
+    prem_high = get_dp(val_ind, "premium_w15")
     prem_lo_pct = prem_low["value"] * 100
     prem_hi_pct = prem_high["value"] * 100
 
     c1, c2, c3 = st.columns(3)
-    c1.metric(
-        "INDA trailing P/E",
-        f"{inda_pe['value']:.2f}x",
-        help=f"Source: {inda_pe['source']} | As of {inda_pe['as_of']}",
-    )
-    c2.metric(
-        "MSCI EM trailing P/E",
-        f"{msci_pe['value']:.2f}x",
-        help=f"Source: {msci_pe['source']} | As of {msci_pe['as_of']}",
-    )
-    c3.metric(
-        "India P/E premium to EM ex-India",
-        f"{prem_lo_pct:.1f}% to {prem_hi_pct:.1f}%",
-        help="Range across India weight assumptions 12% to 15%. Same ex-India construction as Layer 1.",
-    )
+    c1.metric("INDA trailing P/E", f"{inda_pe['value']:.2f}x",
+              help=f"Source: {inda_pe['source']} | As of {inda_pe['as_of']}")
+    c2.metric("MSCI EM trailing P/E", f"{msci_pe['value']:.2f}x",
+              help=f"Source: {msci_pe['source']} | As of {msci_pe['as_of']}")
+    c3.metric("India P/E premium to EM ex-India",
+              f"{prem_lo_pct:.1f}% to {prem_hi_pct:.1f}%",
+              help="Range across India weight assumptions 12% to 15%. Same ex-India construction as Layer 1.")
 
-    with st.expander("Pre-declared valuation bands (thresholds set before scoring India)"):
-        for b in val["premium_bands"]:
-            hi_str = (
-                f"{b['range_high'] * 100:.0f}%"
-                if b["range_high"] is not None
-                else "above 40%"
-            )
+    with st.expander("Valuation bands (current thresholds)"):
+        for b in _live_bands:
+            hi_str = (f"{b['range_high'] * 100:.0f}%"
+                      if b["range_high"] is not None else "above last split")
             lo_str = f"{b['range_low'] * 100:.0f}%"
-            active = b["label"] == "Caution"
-            marker = "   **<< India is here**" if active else ""
+            in_band = (
+                (b["range_high"] is None and _prem >= b["range_low"])
+                or (b["range_high"] is not None and b["range_low"] <= _prem < b["range_high"])
+            )
+            marker = "   **<< India (~23.9%) is here**" if in_band else ""
             st.markdown(f"- **{b['label']}:** {lo_str} to {hi_str}{marker}")
 
-    st.markdown(
-        f"**Rationale:** The {prem_lo_pct:.1f}% to {prem_hi_pct:.1f}% P/E premium places "
-        f"India in the Caution band (20% to 30%). Multiple credible sources (Goldman via "
-        f"Reuters, late 2025 to early 2026) report the premium is below India's own "
-        f"historical norm, which softens but does not erase the headwind. Gate does not "
-        f"trip severe. Caps confidence without breaking the thesis."
-    )
-    st.caption(f"Limitation: {val['acknowledged_limitation']}")
+    if live_val["gate_trips_severe"]:
+        st.markdown(
+            f"**Rationale:** At the current Severe threshold, the {prem_lo_pct:.1f}% to "
+            f"{prem_hi_pct:.1f}% premium triggers a severe gate. This forces the verdict "
+            f"to Rung 4 regardless of structural scores."
+        )
+    else:
+        st.markdown(
+            f"**Rationale:** The {prem_lo_pct:.1f}% to {prem_hi_pct:.1f}% P/E premium places "
+            f"India in the **{live_val['score_display']}** zone. Multiple credible sources "
+            f"(Goldman via Reuters, late 2025 to early 2026) report the premium is below "
+            f"India's own historical norm, which softens but does not erase the headwind. "
+            f"Gate does not trip severe."
+        )
+    st.caption(f"Limitation: {val_ind['acknowledged_limitation']}")
     st.caption(
         f"Sources: {inda_pe['source']} (as of {inda_pe['as_of']}); "
-        f"{msci_pe['source']} (as of {msci_pe['as_of']})"
+        f"{msci_pe['source']} (as of {msci_pe['as_of']}) | "
+        f"Refreshable: No (P/E data requires licensed provider)"
     )
 
     st.divider()
 
     # ── Indicator 2: Demographics (Structural) ────────────────────────────────
-    dem = get_indicator(data, "demographics")
-    indicator_header(dem["name"], dem["role"], dem["score"], dem["score_display"], SCORE_COLORS)
+    indicator_header(dem_ind["name"], dem_ind["role"],
+                     live_dem["score"], live_dem["score_display"], SCORE_COLORS)
 
-    old_ind = get_dp(dem, "old_age_dep_india")
-    old_chn = get_dp(dem, "old_age_dep_china")
-    tot_ind = get_dp(dem, "total_dep_india")
-    tot_chn = get_dp(dem, "total_dep_china")
-    flfp    = get_dp(dem, "female_lfp_india")
-    tlfp    = get_dp(dem, "total_lfp_india")
-
-    old_gap = old_chn["value"] - old_ind["value"]
+    old_ind = get_dp(dem_ind, "old_age_dep_india")
+    old_chn = get_dp(dem_ind, "old_age_dep_china")
+    tot_ind = get_dp(dem_ind, "total_dep_india")
+    tot_chn = get_dp(dem_ind, "total_dep_china")
+    flfp    = get_dp(dem_ind, "female_lfp_india")
+    tlfp    = get_dp(dem_ind, "total_lfp_india")
 
     c1, c2, c3 = st.columns(3)
-    c1.metric(
-        "Old-age dependency",
-        f"India {old_ind['value']} vs China {old_chn['value']}",
-        delta=f"Less than half China's ratio (favorable)",
-        delta_color="off",
-        help=f"Source: {old_ind['source']} | As of {old_ind['as_of']}",
-    )
-    c2.metric(
-        "Total age dependency",
-        f"India {tot_ind['value']} vs China {tot_chn['value']}",
-        help=f"Source: {tot_ind['source']} | As of {tot_ind['as_of']}",
-    )
-    c3.metric(
-        "Female LFP: India",
-        f"{flfp['value']}%",
-        delta=f"Total LFP: {tlfp['value']}%",
-        delta_color="off",
-        help=f"Source: {flfp['source']} | As of {flfp['as_of']}",
-    )
+    c1.metric("Old-age dependency",
+              f"India {old_ind['value']} vs China {old_chn['value']}",
+              delta="Less than half China's ratio (favorable)",
+              delta_color="off",
+              help=f"Source: {old_ind['source']} | As of {old_ind['as_of']}")
+    c2.metric("Total age dependency",
+              f"India {tot_ind['value']} vs China {tot_chn['value']}",
+              help=f"Source: {tot_ind['source']} | As of {tot_ind['as_of']}")
+    c3.metric("Female LFP: India", f"{flfp['value']}%",
+              delta=f"Total LFP: {tlfp['value']}%",
+              delta_color="off",
+              help=f"Source: {flfp['source']} | As of {flfp['as_of']}")
 
+    _ratio = old_ind["value"] / old_chn["value"]
     st.markdown(
-        f"**Rationale:** Old-age dependency of {old_ind['value']} vs China's "
-        f"{old_chn['value']} is a genuine, durable, decade-plus structural advantage: "
-        f"less than half China's ratio. India's working-age share continues rising into "
-        f"the 2040s as China's falls. Female LFP at {flfp['value']}% means the "
-        f"dividend is only partially realized: both a current shortfall and remaining "
-        f"upside if participation rises."
+        f"**Rationale:** Old-age dependency ratio is {old_ind['value']} vs China's "
+        f"{old_chn['value']} (ratio {_ratio:.2f}). Current threshold: Favorable if ratio "
+        f"< {st.session_state['th_dem_ratio']}% (pre-declared: 60%). "
+        f"Female LFP at {flfp['value']}% means the dividend is only partially realized: "
+        f"both a current shortfall and remaining upside if participation rises."
     )
     st.caption(
         f"Source: {old_ind['source']} | As of {old_ind['as_of']} | "
-        f"Refreshable: {'Yes' if old_ind.get('refreshable') else 'No'}"
+        f"Refreshable: No (World Bank WDI; use WGI refresh button for governance only)"
     )
 
     st.divider()
 
     # ── Indicator 3: Governance (Structural) ──────────────────────────────────
-    gov = get_indicator(data, "governance")
-    indicator_header(gov["name"], gov["role"], gov["score"], gov["score_display"], SCORE_COLORS)
+    indicator_header(gov_ind["name"], gov_ind["role"],
+                     live_gov["score"], live_gov["score_display"], SCORE_COLORS)
 
-    wgi_df = governance_as_dataframe(data)
+    # Build WGI table from live or pinned data
+    if st.session_state["wgi_live"]:
+        _wgi_dims = st.session_state["wgi_live"]["dimensions"]
+        _years    = [2014, 2019, 2023]
+        _wgi_rows = []
+        for dim in _wgi_dims:
+            row = {"Dimension": dim["name"]}
+            for yr in _years:
+                row[f"India {yr}"] = dim["india"].get(str(yr))
+                row[f"China {yr}"] = dim["china"].get(str(yr))
+            _wgi_rows.append(row)
+        wgi_df = pd.DataFrame(_wgi_rows).set_index("Dimension")
+    else:
+        wgi_df = governance_as_dataframe(data)
 
     def color_wgi_cell(v):
         if not isinstance(v, (int, float)):
@@ -373,194 +642,221 @@ elif section == "Part 2: Forward Framework":
 
     styled_wgi = _apply_style(wgi_df.style, color_wgi_cell)
     st.dataframe(styled_wgi, use_container_width=True)
-    years_str = ", ".join(str(y) for y in gov["wgi_table"]["years"])
+    years_str = ", ".join(str(y) for y in gov_ind["wgi_table"]["years"])
     st.caption(
-        f"{gov['wgi_table']['scale']}. "
-        f"Years shown: {years_str}. "
-        f"Green = above zero (above global average); red = below zero."
+        f"{gov_ind['wgi_table']['scale']}. "
+        f"Years shown: {years_str}. Green = above zero; red = below zero."
     )
     st.markdown(
-        f"**Rationale:** {gov['score_summary']} "
-        f"Against a broader EM peer set, India likely sits in the middle of the pack. "
-        f"The democratic-institution edge (Voice and Accountability) is a real "
-        f"differentiator from China but has compressed and turned slightly negative by 2023."
+        f"**Rationale:** {live_gov['below_zero_count']} of 6 WGI dimensions are below zero "
+        f"for India (2023). Current threshold: Lean-Negative if {st.session_state['th_gov_count']}+ "
+        f"dimensions below zero (pre-declared: 4). India leads on Rule of Law and Voice and "
+        f"Accountability vs China but trails on Government Effectiveness and Control of Corruption."
     )
-    wgi_src = get_dp(gov, "wgi_source")
+    wgi_src = get_dp(gov_ind, "wgi_source")
     st.caption(
-        f"Source: {wgi_src.get('source', 'World Bank WGI 2025')} | "
-        f"As of {wgi_src.get('as_of', '2026-07-02')} | "
-        f"Refreshable: {'Yes' if wgi_src.get('refreshable') else 'No'}"
+        f"Data source: {_src_tag('wgi')} | "
+        f"Refreshable: Yes (use Refresh WGI button in sidebar)"
     )
 
     st.divider()
 
     # ── Indicator 4: Digital Financial Adoption (Structural) ──────────────────
-    dig = get_indicator(data, "digital_adoption")
-    indicator_header(dig["name"], dig["role"], dig["score"], dig["score_display"], SCORE_COLORS)
+    indicator_header(dig_ind["name"], dig_ind["role"],
+                     live_dig["score"], live_dig["score_display"], SCORE_COLORS)
 
-    ind_any  = get_dp(dig, "india_any_dig_2024")
-    peer_any = get_dp(dig, "peer_median_any_dig_2024")
-    ind_mch  = get_dp(dig, "india_merchant_2024")
-    peer_mch = get_dp(dig, "peer_median_merchant_2024")
+    # Resolve display values (live or pinned)
+    if _fl:
+        _d_india_any   = _fl["india_any"]
+        _d_peer_any    = _fl["peer_median_any"]
+        _d_india_merch = _fl["india_merchant"]
+        _d_peer_merch  = _fl["peer_median_merchant"]
+    else:
+        ind_any_dp  = get_dp(dig_ind, "india_any_dig_2024")
+        peer_any_dp = get_dp(dig_ind, "peer_median_any_dig_2024")
+        ind_mch_dp  = get_dp(dig_ind, "india_merchant_2024")
+        peer_mch_dp = get_dp(dig_ind, "peer_median_merchant_2024")
+        _d_india_any   = ind_any_dp["value"]
+        _d_peer_any    = peer_any_dp["value"]
+        _d_india_merch = ind_mch_dp["value"]
+        _d_peer_merch  = peer_mch_dp["value"]
 
-    gap_any = peer_any["value"] - ind_any["value"]
-    gap_mch = peer_mch["value"] - ind_mch["value"]
+    _gap_any = _d_peer_any  - _d_india_any
+    _gap_mch = _d_peer_merch - _d_india_merch
 
     c1, c2 = st.columns(2)
-    c1.metric(
-        "Any digital payment: India vs EM peer median",
-        f"{ind_any['value']}% vs {peer_any['value']}%",
-        delta=f"India trails by {gap_any}pp",
-        delta_color="inverse",
-        help=f"Source: {ind_any['source']}",
-    )
-    c2.metric(
-        "Digital merchant payment: India vs EM peer median",
-        f"{ind_mch['value']}% vs {peer_mch['value']}%",
-        delta=f"India trails by {gap_mch}pp",
-        delta_color="inverse",
-        help=f"Source: {ind_mch['source']}",
-    )
+    c1.metric("Any digital payment: India vs EM peer median",
+              f"{_d_india_any}% vs {_d_peer_any}%",
+              delta=f"India trails by {_gap_any:.1f}pp",
+              delta_color="inverse")
+    c2.metric("Digital merchant payment: India vs EM peer median",
+              f"{_d_india_merch}% vs {_d_peer_merch}%",
+              delta=f"India trails by {_gap_mch:.1f}pp",
+              delta_color="inverse")
 
-    trend = dig["india_trend_any_digital"]
-    trend_str = " → ".join(f"{t['value']}% ({t['year']})" for t in trend)
+    trend     = dig_ind["india_trend_any_digital"]
+    trend_str = " -> ".join(f"{t['value']}% ({t['year']})" for t in trend)
     st.markdown(f"**India adoption trend (any digital payment):** {trend_str}")
 
+    # Peer table (live or pinned)
     with st.expander("EM peer comparison table, 2024 (World Bank Findex)"):
-        peer_df = digital_peer_table(data)
-        st.dataframe(peer_df, use_container_width=True)
+        if _fl:
+            _ptable = pd.DataFrame([
+                {
+                    "Country":                     r["country"],
+                    "Any digital payment (%)":     r["any_pct"],
+                    "Digital merchant payment (%)": r["merchant_pct"],
+                }
+                for r in _fl["peer_table"]
+            ]).set_index("Country")
+        else:
+            _ptable = digital_peer_table(data)
+        st.dataframe(_ptable, use_container_width=True)
 
     st.markdown(
-        f"**Rationale:** India lags the EM peer median by {gap_any}pp on any digital "
-        f"payment and {gap_mch}pp on merchant payments. Adoption is rising fast from a "
-        f"low base ({trend[0]['value']}% in {trend[0]['year']} to "
-        f"{trend[-1]['value']}% in {trend[-1]['year']}). "
-        f"A convergence-from-behind story, not established leadership."
+        f"**Rationale:** India lags the EM peer median by {_gap_any:.1f}pp on any digital "
+        f"payment and {_gap_mch:.1f}pp on merchant payments. Current threshold: a gap above "
+        f"{st.session_state['th_dig_gap']}pp (pre-declared: 20pp) with an upward trend "
+        f"scores Neutral. Adoption is rising fast from {trend[0]['value']}% "
+        f"({trend[0]['year']}) to {trend[-1]['value']}% ({trend[-1]['year']})."
     )
-    st.caption(dig["honest_note"])
+    st.caption(dig_ind["honest_note"])
     st.caption(
-        f"Source: World Bank Global Findex 2024 (indicators g20.any, merchant.pay). "
-        f"Peer set: China, Indonesia, Brazil, Mexico, South Africa, Turkey, "
-        f"Thailand, Malaysia, Philippines. As of: {ind_any['as_of']}."
+        f"Data source: {_src_tag('findex')} | "
+        f"Refreshable: Yes (use Refresh Findex button in sidebar)"
     )
 
     st.divider()
 
     # ── Indicator 5: External Macro Vulnerability (Gating) ────────────────────
-    ext = get_indicator(data, "external_macro")
-    indicator_header(ext["name"], ext["role"], ext["score"], ext["score_display"], SCORE_COLORS)
+    indicator_header(ext_ind["name"], ext_ind["role"],
+                     live_ext["score"], live_ext["score_display"], SCORE_COLORS)
 
-    inr_drag  = get_dp(ext, "inr_depreciation_rate")
-    oil_share = get_dp(ext, "oil_import_share")
-    oil_dep   = get_dp(ext, "oil_import_dependency")
-    inr_corr  = get_dp(ext, "inda_inr_correlation")
+    inr_drag  = get_dp(ext_ind, "inr_depreciation_rate")
+    oil_share = get_dp(ext_ind, "oil_import_share")
+    inr_corr  = get_dp(ext_ind, "inda_inr_correlation")
 
     c1, c2, c3 = st.columns(3)
-    c1.metric(
-        "INR depreciation vs USD",
-        inr_drag["value"],
-        help=f"Source: {inr_drag['source']} | As of {inr_drag['as_of']}",
-    )
-    c2.metric(
-        "Oil share of import bill",
-        oil_share["value"].replace("approximately ", "~"),
-        help=f"Source: {oil_share['source']} | As of {oil_share['as_of']}",
-    )
-    c3.metric(
-        "INDA vs INR rolling correlation (Layer 1)",
-        inr_corr["value"].replace("approximately ", "~"),
-        help=f"Source: {inr_corr['source']}",
-    )
+    c1.metric("INR depreciation vs USD", inr_drag["value"],
+              help=f"Source: {inr_drag['source']} | As of {inr_drag['as_of']}")
+    c2.metric("Oil share of import bill",
+              oil_share["value"].replace("approximately ", "~"),
+              help=f"Source: {oil_share['source']} | As of {oil_share['as_of']}")
+    c3.metric("INDA vs INR correlation (Layer 1)",
+              inr_corr["value"].replace("approximately ", "~"),
+              help=f"Source: {inr_corr['source']}")
 
     st.markdown(
-        "**Rationale:** INR depreciation is a persistent mild drag on USD-investor "
-        "returns, but Layer 1 found roughly zero correlation between INDA and the rupee "
-        "over the analysis window, meaning the drag has been absorbed historically. "
-        "Oil at ~25% of imports is the shock amplifier: dormant at normal "
-        "prices, dangerous in a major spike. Combined, this is a real but soft gating "
-        "constraint that does not trip severe."
+        f"**Rationale:** INR at ~3.5%/yr depreciation vs mild threshold "
+        f"{st.session_state['th_ext_inr_mild']}%/yr (severe: {st.session_state['th_ext_inr_sev']}%/yr). "
+        f"Oil at ~25% of imports vs mild threshold {st.session_state['th_ext_oil_mild']}% "
+        f"(severe: {st.session_state['th_ext_oil_sev']}%). "
+        f"Current signal: **{live_ext['score_display']}**. "
+        f"Layer 1 found ~0 rolling correlation between INDA and the rupee, "
+        f"meaning the currency drag has been absorbed historically. "
+        f"Oil shock risk is conditional, not structural."
     )
-    st.caption(ext["note"])
+    st.caption(ext_ind["note"])
     st.caption(
         f"Sources: INR forecast from {inr_drag['source']} (as of {inr_drag['as_of']}); "
-        f"oil exposure from {oil_share['source']}; "
-        f"correlation from {inr_corr['source']}."
+        f"oil data from {oil_share['source']} | "
+        f"Refreshable: No (forecast data, not a stable API)"
     )
 
     st.divider()
 
-    # ── Scoring Summary ───────────────────────────────────────────────────────
+    # ── Live Scoring Summary ───────────────────────────────────────────────────
     st.subheader("Scoring Summary")
 
-    score_df = scoring_summary(data)
-
-    _score_key_map = {
-        "Neutral-to-Caution":                      "neutral_to_caution",
-        "Favorable":                                "favorable",
-        "Neutral / Lean-Negative":                  "neutral_lean_negative",
-        "Neutral (negative level, positive trend)": "neutral",
-        "At-Risk (mild-to-conditional)":            "at_risk_mild",
+    _label_map = {
+        "valuation":        ("Valuation",                   "Gating"),
+        "demographics":     ("Demographics",                 "Structural"),
+        "governance":       ("Governance",                   "Structural"),
+        "digital_adoption": ("Digital Adoption",             "Structural"),
+        "external_macro":   ("External Macro Vulnerability", "Gating (soft)"),
     }
+    summary_df = pd.DataFrame([
+        {
+            "indicator": _label_map[k][0],
+            "role":      _label_map[k][1],
+            "score":     v["score_display"],
+        }
+        for k, v in live_scores.items()
+    ])
 
-    def style_score_cell(v):
-        key   = _score_key_map.get(str(v), "neutral")
-        color = SCORE_COLORS.get(key, "#8FA3B1")
+    _disp_to_color = {sd: SCORE_COLORS.get(sk, "#8FA3B1") for sk, sd in SCORE_ICONS.items()}
+    _disp_to_color["Neutral (negative level, positive trend)"] = SCORE_COLORS["neutral"]
+
+    def _style_score(v):
+        color = _disp_to_color.get(str(v), "#8FA3B1")
         return f"background-color:{color}28;color:{color};font-weight:600"
 
-    styled_scores = _apply_style(score_df.style, style_score_cell, subset=["score"])
-    st.dataframe(styled_scores, use_container_width=True, hide_index=True)
+    styled_summary = _apply_style(summary_df.style, _style_score, subset=["score"])
+    st.dataframe(styled_summary, use_container_width=True, hide_index=True)
 
     st.divider()
 
-    # ── Confidence Ladder and Final Verdict ───────────────────────────────────
+    # ── Live Confidence Ladder and Verdict ────────────────────────────────────
     st.subheader("Confidence Ladder and Final Verdict")
 
-    rung = ladder["rung"]
-    ladder_rungs = [
-        (1, "Durable and reasonably priced"),
-        (2, "Durable but priced"),
-        (3, "Structurally attractive, but priced and macro-sensitive"),
-        (4, "Not durable"),
-    ]
+    rung = live_verdict["rung"]
 
-    for r_num, r_label in ladder_rungs:
+    _rung_styles = {
+        1: ("#1e3a2c", "#2D9E6B", "#7ecfa8"),
+        2: ("#3a2e1a", "#C9A84C", "#e8c87a"),
+        3: ("#1e3a5c", "#5B8DB8", "#a8c8e8"),
+        4: ("#3a1a1a", "#E05C5C", "#f0a0a0"),
+    }
+
+    for r_num, r_label in RUNG_LABELS.items():
         active = r_num == rung
-        bg     = "#1e3a5c" if active else "#111827"
-        border = "2px solid #5B8DB8" if active else "1px solid #2a3a4a"
-        weight = "700" if active else "400"
-        arrow  = "   << CURRENT VERDICT" if active else ""
+        if active:
+            bg, border, clr = _rung_styles[r_num]
+            weight, arrow = "700", "   << CURRENT VERDICT"
+            color_css = f"color:{clr};"
+        else:
+            bg, border = "#111827", "#2a3a4a"
+            weight, arrow, color_css = "400", "", ""
         st.markdown(
-            f'<div style="background:{bg};border:{border};border-radius:6px;'
-            f'padding:10px 18px;margin:3px 0;font-weight:{weight};">'
+            f'<div style="background:{bg};border:2px solid {border};border-radius:6px;'
+            f'padding:10px 18px;margin:3px 0;font-weight:{weight};{color_css}">'
             f'<span style="opacity:0.55;">Rung {r_num}:</span> {r_label}{arrow}</div>',
             unsafe_allow_html=True,
         )
 
     st.markdown("&nbsp;", unsafe_allow_html=True)
 
-    # Rung verdict card
-    rung_label = f"RUNG {rung}: {ladder['label'].upper()}"
+    _vbg, _vborder, _vtxt = _rung_styles[rung]
     st.markdown(
-        f'<div style="background:#1e3a5c;border:2px solid #5B8DB8;color:#a8c8e8;'
+        f'<div style="background:{_vbg};border:2px solid {_vborder};color:{_vtxt};'
         f'padding:16px 28px;border-radius:8px;font-size:1.3rem;font-weight:700;'
-        f'text-align:center;letter-spacing:0.04em;">{rung_label}</div>',
+        f'text-align:center;letter-spacing:0.04em;">'
+        f'RUNG {rung}: {RUNG_LABELS[rung].upper()}</div>',
         unsafe_allow_html=True,
     )
 
     st.markdown("&nbsp;", unsafe_allow_html=True)
 
-    st.markdown(f"**Derivation:** {ladder['derivation']}")
-    st.markdown(f"**Verdict:** {ladder['verdict_statement']}")
+    st.markdown(f"**Derivation:** {live_verdict['derivation']}")
+    st.markdown(f"**Declared verdict:** {pinned['verdict_statement']}")
 
     st.divider()
 
     st.subheader("Direct Answer to the Thesis Question")
-    st.info(ladder["thesis_answer"])
-    st.markdown(f"**Analyst's journey:** {ladder['analysts_journey']}")
+    st.info(pinned["thesis_answer"])
+    st.markdown(f"**Analyst's journey:** {pinned['analysts_journey']}")
 
     st.divider()
+    _data_note = []
+    if off_live:
+        _data_note.append("live World Bank API data active")
+    else:
+        _data_note.append("pinned mid-2026 dataset")
+    if off_default:
+        _data_note.append("non-default thresholds active")
     st.caption(
         "Layer 2 framework: five indicators, pre-declared thresholds, gated confidence "
-        "ladder. Design notes in scratch/layer2_framework.md (not committed). "
-        "Data sourced from data/layer2_indicators.json (pinned mid-2026 dataset)."
+        f"ladder. Currently showing: {' | '.join(_data_note)}. "
+        "Declared Rung 3 verdict uses pre-declared defaults and pinned data. "
+        "Data from data/layer2_indicators.json and World Bank API."
     )
