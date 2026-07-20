@@ -188,7 +188,7 @@ with st.sidebar:
     st.divider()
     section = st.radio(
         "Section",
-        ["Part 1: Historical Analysis", "Part 2: Forward Framework"],
+        ["Part 1: Historical Analysis", "Part 2: Forward Framework", "What Moves the Verdict?"],
         index=0,
     )
     st.divider()
@@ -1157,4 +1157,207 @@ elif section == "Part 2: Forward Framework":
         f"ladder. Currently showing: {' | '.join(_data_note)}. "
         "Declared Rung 3 verdict uses pre-declared defaults and pinned data. "
         "Data from data/layer2_indicators.json and World Bank API."
+    )
+
+elif section == "What Moves the Verdict?":
+    import json as _json
+    from src.assumption_audit import run_assumption_audit, _FULL_DEFAULTS
+    from src.verdict_agents import run_pipeline
+
+    # ── Load pinned data and run the audit (pure Python, always runs) ──────────
+    _audit_data_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "data", "layer2_indicators.json"
+    )
+    with open(_audit_data_path) as _f:
+        _audit_raw = _json.load(_f)
+
+    _audit = run_assumption_audit(_audit_raw, _FULL_DEFAULTS)
+
+    d   = _audit["nearest_downgrade"]
+    ps  = _audit["profile_stability"]
+    blk = _audit["upgrade_blockers"]
+
+    # ── Page header ────────────────────────────────────────────────────────────
+    st.header("What Moves the Verdict?")
+    st.caption(
+        "This section stress-tests the Rung 3 verdict. "
+        "All numbers below are produced by the same Python scoring model "
+        "that drives Part 2. The LLM narrative (if available) only explains "
+        "what the model found -- it does not add claims or forecasts of its own."
+    )
+
+    st.divider()
+
+    # ── Current standing ───────────────────────────────────────────────────────
+    st.subheader("Current Standing")
+    _rung_clr = "#1A7070"
+    st.markdown(
+        f'<div style="background:#081A20;border:2px solid {_rung_clr};'
+        f'color:#5CC4C0;padding:14px 22px;border-radius:8px;'
+        f'font-size:1.2rem;font-weight:800;font-family:Georgia,Cambria,serif;'
+        f'letter-spacing:0.05em;text-align:center;margin-bottom:8px;">'
+        f'RUNG {_audit["current_rung"]}: {_audit["current_rung_label"].upper()}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(f"**Derivation:** {_audit['current_derivation']}")
+
+    st.divider()
+
+    # ── Upgrade blockers ───────────────────────────────────────────────────────
+    st.subheader("What Would Trigger an Upgrade?")
+    st.markdown(
+        "Rungs 1 and 2 require favorable scores on governance and digital adoption. "
+        "Both are blocked by fixed data constraints -- threshold changes alone cannot "
+        "resolve them."
+    )
+
+    _blocker_cols = st.columns(2)
+    for _i, (_col, _blocker) in enumerate(zip(_blocker_cols, blk)):
+        with _col:
+            st.markdown(
+                f'<div style="background:#FBF7EF;border:1.5px solid #D8C8A8;'
+                f'border-radius:10px;padding:16px 18px;'
+                f'box-shadow:0 1px 4px rgba(92,26,27,0.07);">'
+                f'<div style="font-size:0.7rem;text-transform:uppercase;'
+                f'letter-spacing:0.08em;color:#8A7B6B;font-weight:700;margin-bottom:6px;">'
+                f'Upgrade Blocker {_i + 1}</div>'
+                f'<div style="font-size:1rem;font-weight:700;color:#3A1010;'
+                f'font-family:Georgia,Cambria,serif;margin-bottom:8px;">'
+                f'{_blocker["indicator"]}</div>'
+                f'<div style="font-size:0.875rem;color:#2C1A0E;line-height:1.5;">'
+                f'{_blocker["why_threshold_cant_fix"]}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.divider()
+
+    # ── Nearest downgrade boundary ─────────────────────────────────────────────
+    st.subheader("Nearest Downgrade Boundary")
+    st.markdown(
+        "The table below shows the only path to Rung 4 visible in the current data. "
+        "This is a model boundary defined before scoring began, not a market forecast "
+        "or a projection of where the premium is headed."
+    )
+
+    _dc1, _dc2, _dc3 = st.columns(3)
+    _dc1.metric(
+        "Current P/E premium",
+        f"{d['current_value_pct']}%",
+        help="India vs EM ex-India. Source: pinned mid-2026 dataset.",
+    )
+    _dc2.metric(
+        "Declared severe gate",
+        f"{d['trigger_value_pct']:.0f}%",
+        help="Pre-declared threshold. Fixed before scoring; not tuned to data.",
+    )
+    _dc3.metric(
+        "Gap to severe gate",
+        f"{d['gap_pp']}pp",
+        help=f"Relative to current: {d['gap_relative_pct']}% increase needed.",
+    )
+
+    st.markdown(
+        f'<div style="background:#FBF7EF;border-left:4px solid #A06010;'
+        f'padding:12px 16px;border-radius:0 8px 8px 0;margin-top:8px;">'
+        f'<span style="color:#A06010;font-weight:700;">Plausibility: </span>'
+        f'<span style="color:#2C1A0E;">{d["plausibility_label"].capitalize()}. '
+        f'{d["boundary_note"]}</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
+
+    # ── Profile stability ──────────────────────────────────────────────────────
+    st.subheader("Framework Robustness")
+
+    _stable_color = "#1A6B3C" if ps["stable"] else "#9C1A18"
+    _stable_label = "Stable across all tested profiles" if ps["stable"] else "Varies across profiles"
+    st.markdown(
+        f'<div style="background:#FBF7EF;border:1.5px solid #D8C8A8;'
+        f'border-radius:10px;padding:14px 18px;'
+        f'box-shadow:0 1px 4px rgba(92,26,27,0.07);">'
+        f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
+        f'<span style="background:{_stable_color}28;border:1.5px solid {_stable_color};'
+        f'color:{_stable_color};padding:2px 12px;border-radius:10px;'
+        f'font-weight:700;font-size:0.8rem;">{_stable_label}</span>'
+        f'</div>'
+        f'<div style="color:#2C1A0E;font-size:0.9rem;line-height:1.6;">{ps["note"]}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
+
+    # ── Agent narrative ────────────────────────────────────────────────────────
+    st.subheader("Analytical Narrative")
+    st.caption(
+        "The narrative below is generated by an LLM agent chain. "
+        "The agents may only reference numbers and claims present in the Python audit above. "
+        "If the LLM is unavailable, the deterministic verdict above is unchanged."
+    )
+
+    if "wmv_pipeline_outputs" not in st.session_state:
+        st.session_state["wmv_pipeline_outputs"] = None
+
+    _run_col, _clear_col = st.columns([2, 1])
+    _run_btn   = _run_col.button("Generate narrative", key="wmv_run")
+    _clear_btn = _clear_col.button("Clear", key="wmv_clear")
+
+    if _clear_btn:
+        st.session_state["wmv_pipeline_outputs"] = None
+
+    if _run_btn:
+        with st.spinner("Running agent pipeline..."):
+            try:
+                st.session_state["wmv_pipeline_outputs"] = run_pipeline(_audit)
+            except Exception as _exc:
+                st.session_state["wmv_pipeline_outputs"] = {
+                    "analysis": f"[Pipeline unavailable: {_exc}]",
+                    "validation": {"passed": False, "failures": [str(_exc)], "warnings": []},
+                    "overreach_check": "",
+                }
+
+    _out = st.session_state.get("wmv_pipeline_outputs")
+
+    if _out is None:
+        st.info("Click 'Generate narrative' to run the LLM agent pipeline.")
+    else:
+        _analysis = _out.get("analysis", "")
+        _val      = _out.get("validation", {})
+        _overreach = _out.get("overreach_check", "")
+
+        if _analysis.startswith("["):
+            st.error(_analysis)
+        else:
+            st.markdown(_analysis)
+
+            # Validation badge
+            if _val.get("passed"):
+                _vchip_bg, _vchip_fg, _vchip_txt = "#1A6B3C28", "#1A6B3C", "Fact-check passed"
+            else:
+                _vchip_bg, _vchip_fg, _vchip_txt = "#9C1A1828", "#9C1A18", "Fact-check failed"
+            st.markdown(
+                f'<span style="background:{_vchip_bg};border:1.5px solid {_vchip_fg};'
+                f'color:{_vchip_fg};padding:2px 12px;border-radius:10px;'
+                f'font-weight:700;font-size:0.8rem;">{_vchip_txt}</span>',
+                unsafe_allow_html=True,
+            )
+            for _fail in _val.get("failures", []):
+                st.warning(f"Validation: {_fail}")
+            for _warn in _val.get("warnings", []):
+                st.caption(f"Note: {_warn}")
+
+            if _overreach:
+                with st.expander("Overreach check"):
+                    st.markdown(_overreach)
+
+    st.divider()
+    st.caption(
+        "All quantitative claims in this section derive from "
+        "src/assumption_audit.py using pre-declared defaults and pinned data. "
+        "The LLM pipeline (src/verdict_agents.py) uses Google Gemini; "
+        "key loaded from .env. Narrative does not affect the scored verdict."
     )
