@@ -1197,7 +1197,7 @@ elif section == "What Moves the Verdict?":
         "This section stress-tests the Rung 3 verdict. "
         "All numbers below are produced by the same Python scoring model "
         "that drives Part 2. The LLM narrative (if available) only explains "
-        "what the model found -- it does not add claims or forecasts of its own."
+        "what the model found; it does not add claims or forecasts of its own."
     )
 
     st.divider()
@@ -1222,12 +1222,17 @@ elif section == "What Moves the Verdict?":
     st.subheader("What Would Trigger an Upgrade?")
     st.markdown(
         "Rungs 1 and 2 require favorable scores on governance and digital adoption. "
-        "Both are blocked by fixed data constraints -- threshold changes alone cannot "
+        "Both are blocked by fixed data constraints; threshold changes alone cannot "
         "resolve them."
     )
 
+    _indicator_labels = {
+        "governance":       "Governance",
+        "digital_adoption": "Digital Adoption",
+    }
     _blocker_cols = st.columns(2)
     for _i, (_col, _blocker) in enumerate(zip(_blocker_cols, blk)):
+        _ind_display = _indicator_labels.get(_blocker["indicator"], _blocker["indicator"].replace("_", " ").title())
         with _col:
             st.markdown(
                 f'<div style="background:#FBF7EF;border:1.5px solid #D8C8A8;'
@@ -1238,7 +1243,7 @@ elif section == "What Moves the Verdict?":
                 f'Upgrade Blocker {_i + 1}</div>'
                 f'<div style="font-size:1rem;font-weight:700;color:#3A1010;'
                 f'font-family:Georgia,Cambria,serif;margin-bottom:8px;">'
-                f'{_blocker["indicator"]}</div>'
+                f'{_ind_display}</div>'
                 f'<div style="font-size:0.875rem;color:#2C1A0E;line-height:1.5;">'
                 f'{_blocker["why_threshold_cant_fix"]}</div>'
                 f'</div>',

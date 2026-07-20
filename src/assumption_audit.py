@@ -153,11 +153,10 @@ def _governance_blocker(india_wgi_2023: dict) -> UpgradeBlocker:
         why_threshold_cant_fix=(
             f"India 2023 has {count} of 6 WGI dimensions below zero "
             f"({', '.join(below_zero)}). "
-            "The 'favorable' cutoff is fixed at <= 1 -- it is not a parameter. "
-            "The adjustable parameter (neutral_neg_threshold) controls only the "
-            "neutral vs neutral_lean_negative boundary, not the path to favorable. "
-            "No threshold change can bring {count} below-zero dimensions to <= 1. "
-            "Only improved WGI survey data can unlock favorable."
+            "Reaching the favorable tier requires at most 1 dimension below zero. "
+            "This is a fixed requirement in the model definition, not an adjustable threshold. "
+            "The only path to favorable governance is a genuine improvement in the "
+            "underlying WGI survey results."
         ),
     )
 
@@ -174,10 +173,10 @@ def _digital_blocker(india_any: float, peer_any: float) -> UpgradeBlocker:
         why_threshold_cant_fix=(
             f"India any-digital-payment rate is {india_any}% vs EM peer median {peer_any}% "
             f"(gap: {gap:.0f}pp). "
-            "The favorable condition requires India at or above the peer median. "
-            "The large_gap parameter shifts only the neutral vs at_risk_mild boundary -- "
-            "it does not lower the favorable condition. "
-            "No threshold change makes 48 >= 71. "
+            "Reaching the favorable tier requires India's rate to be at or above the peer median. "
+            "The adjustable scoring threshold governs how large a gap triggers a negative signal, "
+            "not the favorable cutoff itself. "
+            f"No threshold change can make {india_any}% >= {peer_any}%. "
             "Only improved Findex survey data can unlock favorable."
         ),
     )
