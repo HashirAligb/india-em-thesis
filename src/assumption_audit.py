@@ -235,9 +235,10 @@ def _nearest_downgrade(thresholds: dict, india_wgi_2023: dict,
         boundary_note=(
             "This is a data milestone: the premium itself would need to reach 40% "
             "for the declared severe gate to open. "
-            "No single threshold slider achieves this at current premium levels, "
-            "because the band max() constraint prevents val_severe from falling below "
-            "~35% independently of val_atrisk."
+            "No single threshold change achieves this at current premium levels, "
+            "because the scoring bands are required to be at least 5 percentage points "
+            "wide each, so the severe tier cannot open below roughly 35% regardless "
+            "of how other thresholds are set."
         ),
     )
 

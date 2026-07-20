@@ -57,6 +57,20 @@ section[data-testid="stSidebar"] .stButton > button:hover {
     color: #FBF7EF !important;
     border-color: #7A2A2B !important;
 }
+/* Sidebar headings: override the global burgundy h1/h2/h3 so they read on dark bg */
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 {
+    color: #E8D8C0 !important;
+    font-family: Georgia, Cambria, serif !important;
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
+}
+/* Radio option text in sidebar */
+section[data-testid="stSidebar"] [data-testid="stRadio"] p,
+section[data-testid="stSidebar"] [data-testid="stRadio"] span {
+    color: #E8D8C0 !important;
+}
 
 /* --- Page headers: serif burgundy --- */
 h2 {
@@ -1325,9 +1339,9 @@ elif section == "What Moves the Verdict?":
     if _out is None:
         st.info("Click 'Generate narrative' to run the LLM agent pipeline.")
     else:
-        _analysis = _out.get("analysis", "")
-        _val      = _out.get("validation", {})
-        _overreach = _out.get("overreach_check", "")
+        _analysis  = _out.get("analysis", "").replace("—", ",").replace("–", ",")
+        _val       = _out.get("validation", {})
+        _overreach = _out.get("overreach_check", "").replace("—", ",").replace("–", ",")
 
         if _analysis.startswith("["):
             st.error(_analysis)

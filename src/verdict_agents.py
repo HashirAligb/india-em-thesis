@@ -176,10 +176,31 @@ def validate_analysis(audit: AuditResult, analysis_text: str) -> ValidationResul
         "1", "2", "4", "5", "6",
         "48", "71", "23",        # digital adoption figures in audit
         "10",                    # old-age dep india (in WGI context)
+        "35",                    # minimum severe-band floor (atrisk+5pp) in boundary note
     }
+
+    def _canon(s: str) -> str:
+        """Normalize a number string for comparison against the allowed set.
+
+        Handles two false-positive cases:
+        - "40.0" (LLM writes the trigger with one decimal) -> "40"
+        - "0.40" (LLM writes the premium as a fraction)    -> "40"
+        """
+        try:
+            f = float(s)
+            if 0 < f < 1:          # fraction -> percentage
+                f = round(f * 100, 1)
+            if f == int(f):
+                return str(int(f))  # drop trailing .0
+            return s
+        except ValueError:
+            return s
+
+    # Require digits after a decimal so "3." (sentence end) -> "3" not "3.",
+    # and "16.1pp" -> "16.1" not split into "16" + "1".
     invented = [
-        n for n in re.findall(r"\d+\.?\d*", analysis_text)
-        if n not in allowed and len(n) > 1
+        n for n in re.findall(r"\d+(?:\.\d+)?", analysis_text)
+        if _canon(n) not in allowed and n not in allowed
     ]
     if invented:
         warnings.append(
