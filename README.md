@@ -1,98 +1,175 @@
-# Thesis #16: Emerging Markets: India's Decade to Shine?
+# Thesis #16: Emerging Markets — India's Decade to Shine?
 
-A quantitative and qualitative framework to test whether India can outperform broad EM and China in USD terms, or whether the India "decade" narrative is overhyped and already priced in.
+A two-layer quantitative framework testing whether India can outperform broad EM
+and China in USD terms, or whether the "India decade" narrative is overhyped and
+already priced in.
 
----
-
-## Thesis Statement
-
-I am skeptical: I believe China remains the dominant / more advanced EM, and India's "decade" narrative may be overhyped or already priced in.
-
-The primary question is whether India can deliver measurably better risk-adjusted USD returns than EM (EEM) and China (FXI/MCHI) over 2013–present, while any valuation premium is justified by superior fundamentals.
-
-What would prove this wrong: If India shows measurably better risk-adjusted USD returns vs EM and China over the 2013–present period, AND any current valuation premium is justified by superior fundamentals.
+**Thesis stance:** Skeptical. China remains the dominant EM; India's decade narrative
+may be overhyped or already priced in.
 
 ---
 
-## Project Structure
+## How It Works
+
+The analysis runs in two sequential layers.
+
+### Layer 1 — Historical Performance (2013–2026)
+
+Compares INDA (India ETF), EM ex-India (EEM with India's contribution removed),
+and FXI (China ETF) across cumulative return, CAGR, annualised volatility,
+max drawdown, and a Sharpe-style ratio (annualised return / annualised vol,
+0% risk-free rate). Also tracks the rolling 12-month correlation between INDA
+and the EM ex-India benchmark, and between INDA and the USD/INR spot rate.
+
+All returns are in USD, dividend-adjusted. The EM ex-India benchmark removes India's
+weight using a fixed 15% approximation: `r_ex = (r_eem − 0.15 × r_inda) / (1 − 0.15)`.
+
+**Layer 1 verdict rule:** SUPPORTED if INDA beats both benchmarks on cumulative
+return AND Sharpe-style ratio; PARTIALLY SUPPORTED if it beats on one; NOT SUPPORTED
+otherwise.
+
+### Layer 2 — Forward Framework (mid-2026 snapshot)
+
+Five indicators scored against pre-declared thresholds on a four-rung confidence
+ladder. Thresholds were fixed before scoring began and are not tuned to the data.
+
+| Indicator | Role | Current score |
+|---|---|---|
+| Valuation (P/E premium) | Gating | Neutral to Caution (23.9% premium) |
+| Demographics | Structural | Favorable |
+| Governance (WGI) | Structural | Neutral-Lean-Negative |
+| Digital Adoption (Findex) | Structural | Neutral |
+| External Macro (INR + oil) | Gating (soft) | At-risk mild |
+
+**Ladder verdict rule:**
+1. If any gating indicator trips the severe threshold → Rung 4 (Not durable).
+2. Else if any structural indicator is not Favorable → Rung 3 (Structurally
+   attractive, but priced and macro-sensitive).
+3. Else if valuation is Favorable or Neutral → Rung 1 (Durable and reasonably
+   priced). Otherwise → Rung 2 (Durable but priced).
+
+**Current verdict: Rung 3.** Governance and Digital Adoption are not Favorable;
+no severe gate is tripped.
+
+### AI Audit Layer (Assumption Auditor)
+
+A Python module (`src/assumption_audit.py`) stress-tests the Rung 3 verdict:
+it identifies upgrade blockers, computes the nearest downgrade boundary (the
+valuation premium must reach the declared 40% severe gate — currently 16.1pp
+away), and checks stability across three threshold profiles.
+
+An LLM pipeline (`src/verdict_agents.py`) then narrates the audit result using
+Google Gemini. The architecture enforces a strict separation: Python computes
+every number, the first Gemini call explains the Python output in plain English,
+a Python fact-validator checks that the explanation contains no invented numbers
+or imminence language, and a second Gemini call checks for soft overreach.
+If any LLM call fails, the deterministic verdict is unchanged.
+
+---
+
+## Architecture
 
 ```
-india-em-thesis/
-├── data/
-│   ├── raw/          # Unmodified source data (yfinance pulls, World Bank CSVs, etc.)
-│   └── processed/    # Cleaned, merged, and transformed datasets
-├── notebooks/        # Exploratory and presentation notebooks
-├── src/
-│   ├── data/         # Data ingestion and cleaning modules
-│   ├── analysis/     # Modelling, stress testing, and statistical work
-│   └── viz/          # Chart and figure generation
-├── outputs/
-│   ├── figures/      # Saved charts and plots
-│   └── reports/      # Rendered summaries and tables
-└── tests/            # Unit tests for src modules
+src/
+  bronze/
+    analysis.py       # Layer 1: downloads data, computes metrics, generates charts
+  data_engine.py      # Downloads and caches price data via yfinance
+  layer2.py           # Layer 2: scoring functions and compute_ladder_verdict()
+  assumption_audit.py # Stress-tests the verdict; produces AuditResult
+  verdict_agents.py   # Gemini agent pipeline (explain -> validate -> check overreach)
+  wb_refresh.py       # Live World Bank API refresh (WGI, Findex)
+
+data/
+  layer1_summary.csv          # Pinned Layer 1 metrics
+  layer1_rolling_corr.csv     # Pinned rolling correlation series
+  layer2_indicators.json      # All Layer 2 indicator values and metadata
+
+outputs/figures/              # Four static chart PNGs (auto-generated)
+
+app.py                        # Streamlit app (display only, no compute logic)
+DECISIONS.md                  # Methodology log: what was tried, changed, and why
+tests/
+  test_layer2.py              # pytest suite for Layer 2 scoring functions
 ```
 
----
-
-## Research Pillars
-
-### Bull Case (Tailwinds)
-| Pillar | Key Metrics |
-|---|---|
-| Demographics | Working-age population share, dependency ratio vs. China |
-| Digital Infrastructure | UPI transaction volume, internet penetration, Aadhaar coverage |
-| Geopolitical Tailwinds | FDI inflows, PLI scheme capex, supply chain diversification proxies |
-| Macro Fundamentals | GDP growth, current account trajectory, forex reserves |
-
-### Bear Case (Stress Tests)
-| Risk | Key Metrics |
-|---|---|
-| Governance & Rule of Law | World Bank WGI scores, ease of doing business rank, contract enforcement |
-| Currency Volatility | INR/USD historical vol, real effective exchange rate, drawdown analysis |
-| Valuation | Nifty P/E vs. EM peers, CAPE, EV/EBITDA sector comps |
-| Liquidity & Contagion | Correlation with broad EM selloffs, FII flow reversals |
-
----
-
-## Verdict Framework
-
-The thesis is **confirmed** if, after stress-testing:
-1.  Expected 10-year USD-adjusted return exceeds EM ex-India benchmark by ≥2% annualised.
-
-   (My rationale: India trades at a ~20-30% valuation premium over broad EM; 2% annual 
-   outperformance is the approximate return needed to justify that premium over a 
-   10-year horizon.) 
-
-2. Max drawdown under adverse currency + governance shock does not exceed peer EM average.
-3. Valuation premium is justified by superior earnings growth trajectory (PEG-adjusted).
-
----
-
-## Planned lower-tier analysis (due June 22)
-1. Cumulative USD return chart: INDA vs EEM vs FXI/MCHI
-2. Volatility and max drawdown comparison across all three
-3. Correlation analysis: India returns vs EM returns and vs USD/INR
-4. Current valuation snapshot (P/E, P/B) for INDA vs EEM vs FXI
-5. Written verdict framed as supported / partially supported / not supported
-
-> Note: This README and `DECISIONS.md` were refined through review by two AI models (Claude and GPT) before any code was written, as part of the documented decision process.
+The app contains no scoring logic. All computations happen in `src/`. The
+Streamlit layer reads results and renders them.
 
 ---
 
 ## Setup
 
 ```bash
+git clone https://github.com/HashirAligb/india-em-thesis.git
+cd india-em-thesis
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+For the AI audit layer, create a `.env` file with your Google AI Studio key:
+
+```
+GEMINI_API_KEY=your_key_here
+```
+
+---
+
+## Running
+
+```bash
+# Streamlit app (main interface)
+streamlit run app.py
+
+# Regenerate Layer 1 charts and metrics (downloads live data)
+python src/bronze/analysis.py
+
+# Verify Layer 2 defaults reproduce Rung 3
+python src/layer2.py
+
+# Run assumption audit smoke test
+python src/assumption_audit.py
+
+# Run agent pipeline smoke test (requires GEMINI_API_KEY in .env)
+python src/verdict_agents.py
+
+# Run tests
+pytest tests/
 ```
 
 ---
 
 ## Data Sources
 
-- **Market data**: `yfinance` (Nifty 50, sectoral indices, EM ETFs)
-- **Macro data**: World Bank API, IMF WEO, RBI publications
-- **Governance data**: World Bank Worldwide Governance Indicators (WGI)
-- **Demographics**: UN Population Division, Census of India
-- **Digital infra**: NPCI (UPI stats), TRAI (telecom data), MeitY publications
+| Data | Source | Refresh method |
+|---|---|---|
+| ETF prices (INDA, EEM, FXI, INR=X) | Yahoo Finance via yfinance | `python src/bronze/analysis.py` |
+| WGI governance scores | World Bank API (source=3, .EST codes) | Sidebar refresh button |
+| Digital adoption (Findex) | World Bank Findex API | Sidebar refresh button |
+| INDA P/E, MSCI EM P/E | iShares / MSCI factsheets | Manual (pinned mid-2026) |
+| INR depreciation rate, oil share | Analyst consensus (MUFG/Reuters) | Manual (pinned mid-2026) |
+
+The app displays whether live or pinned data is active. Layer 2 scoring uses
+pinned mid-2026 data by default for reproducibility.
+
+---
+
+## Verification
+
+`src/layer2.py` includes `_verify_defaults()`, which asserts that the five
+scoring functions with pre-declared defaults reproduce the locked Rung 3 verdict
+exactly. `pytest tests/` runs the same assertions as a proper test suite.
+
+---
+
+## Key Decisions and Failures
+
+See `DECISIONS.md` for the full methodology log, including:
+- Benchmark contamination fix (original code compared INDA against raw EEM,
+  which includes ~15% India — effectively India vs. itself)
+- Currency and oil merged into one indicator (separating them double-counted
+  the same risk)
+- Risk-adjusted metric added to Layer 1 verdict after red-team (cumulative
+  return alone was insufficient)
+- Indicators dropped from Layer 2 (FDI, geopolitical tailwinds, earnings premium)
+  and why

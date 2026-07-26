@@ -301,8 +301,7 @@ if section == "Part 1: Historical Analysis":
     st.header("Layer 1: Historical Performance (2013 to 2026)")
     st.caption(
         "Window: 2013-01-01 to 2026-06-25, pinned for reproducibility. "
-        "Source: Yahoo Finance via yfinance (auto_adjust=True). "
-        "All returns in USD."
+        "Source: Yahoo Finance (dividend-adjusted total returns, in USD)."
     )
 
     # ── Summary table ─────────────────────────────────────────────────────────
@@ -330,9 +329,8 @@ if section == "Part 1: Historical Analysis":
 
     st.dataframe(display, use_container_width=True)
     st.caption(
-        "EM ex-India benchmark: India's contribution removed using a fixed ~15% weight "
-        "(same ex-India construction as used in the verdict). "
-        "Sharpe-style ratio uses 0% risk-free rate (documented in DECISIONS.md)."
+        "EM ex-India benchmark: India's contribution removed at a fixed ~15% weight (approximation). "
+        "Sharpe-style ratio uses 0% risk-free rate."
     )
 
     st.divider()
@@ -970,7 +968,7 @@ elif section == "Part 2: Forward Framework":
               oil_share["value"].replace("approximately ", "~"),
               help=f"Source: {oil_share['source']} | As of {oil_share['as_of']}")
     c3.metric("INDA vs INR correlation (Layer 1)",
-              inr_corr["value"].replace("approximately ", "~"),
+              inr_corr["value"],
               help=f"Source: {inr_corr['source']}")
 
     st.markdown(
@@ -979,8 +977,9 @@ elif section == "Part 2: Forward Framework":
         f"Oil at ~25% of imports vs mild threshold {st.session_state['th_ext_oil_mild']}% "
         f"(severe: {st.session_state['th_ext_oil_sev']}%). "
         f"Current signal: **{live_ext['score_display']}**. "
-        f"Layer 1 found ~0 rolling correlation between INDA and the rupee, "
-        f"meaning the currency drag has been absorbed historically. "
+        f"Layer 1 found a low positive rolling correlation between INDA and the rupee "
+        f"(mean +0.05, range -0.16 to +0.29), meaning currency drag has not been a "
+        f"material driver of equity returns historically. "
         f"Oil shock risk is conditional, not structural."
     )
     st.caption(ext_ind["note"])

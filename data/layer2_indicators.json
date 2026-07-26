@@ -70,7 +70,7 @@
           "value": 0.239,
           "unit": "fraction",
           "as_of": "2026-07-02",
-          "source": "Derived: same ex-India construction as Layer 1 benchmark correction",
+          "source": "Derived: (EM_PE - w*India_PE)/(1-w), then India_PE/EM_ex_PE - 1, with w=0.13",
           "source_type": "derived",
           "refreshable": false
         },
@@ -80,7 +80,7 @@
           "value": 0.246,
           "unit": "fraction",
           "as_of": "2026-07-02",
-          "source": "Derived: same ex-India construction as Layer 1 benchmark correction",
+          "source": "Derived: (EM_PE - w*India_PE)/(1-w), then India_PE/EM_ex_PE - 1, with w=0.15",
           "source_type": "derived",
           "refreshable": false
         },
@@ -374,10 +374,10 @@
         {
           "id": "inda_inr_correlation",
           "label": "INDA vs INR rolling 12-month correlation (Layer 1 finding)",
-          "value": "approximately 0",
+          "value": "+0.05 mean (range -0.16 to +0.29)",
           "unit": "text",
           "as_of": "2026-06-25",
-          "source": "Layer 1 rolling correlation analysis (src/data_engine.py)",
+          "source": "Computed: 252-day rolling window, 2014-01-16 to 2026-06-25, from layer1_rolling_corr.csv",
           "source_type": "API",
           "refreshable": true
         }
