@@ -14,9 +14,9 @@ Tracks key analytical and methodological choices made during the research proces
 ---
 
 ### [2026-06-10] Currency Adjustment Methodology
-**Decision**: Convert all Indian equity returns to USD terms using spot INR/USD rates before any performance comparison.
-**Rationale**: The thesis is written from the perspective of a USD-denominated global allocator. Local-currency returns are misleading without currency adjustment.
-**Alternatives considered**: Using hedged returns; rejected because INR hedging costs are a real cost that should not be abstracted away in the stress test.
+**Decision**: Measure all returns in USD by using USD-denominated ETFs (INDA, EEM, FXI) rather than converting local-currency returns via spot rates. Because these funds trade in dollars, the currency effect — including rupee depreciation against the dollar — is already embedded in the fund price, so a USD investor's actual experience is captured directly.
+**Rationale**: The thesis is written from the perspective of a USD-denominated global allocator; USD ETFs reflect real dollar returns without a separate conversion step.
+**Alternatives considered**: Manually converting INR-denominated returns at spot rates (rejected as redundant, since USD ETFs already embed the currency effect); currency-hedged returns (rejected because INR hedging costs are a real drag that should not be abstracted away in a stress test).
 
 ---
 
@@ -25,12 +25,16 @@ Tracks key analytical and methodological choices made during the research proces
 **Rationale**: Trailing P/E and P/B are widely available for USD ETFs and support a pragmatic, comparable valuation screen. India's premium (if any) over EEM/FXI must be justified by superior returns or lower risk, not assumed acceptable.
 **Alternatives considered**: CAPE; excluded from primary tier because of inconsistent availability across markets. EV/EBITDA remains useful as a secondary sector-level metric.
 
+> **[REVISED 2026-07-06]** The final valuation indicator uses the trailing P/E premium only, not P/E and P/B. `score_valuation()` takes a single P/E premium parameter (`premium=0.239`) scored against pre-declared bands; the JSON carries `inda_pe` and `msci_em_pe` with premium variants. P/B was dropped and CAPE was never implemented — the two-metric design became a single-metric P/E design.
+
 ---
 
 ### [2026-06-10] Governance Risk Quantification
 **Decision**: Use World Bank WGI composite score (average of 6 dimensions) as primary governance proxy, supplemented by Transparency International CPI.
 **Rationale**: WGI is the most widely used cross-country governance dataset with a long history (1996–present). CPI adds a corruption-specific signal.
 **Alternatives considered**: V-Dem dataset; richer but harder to operationalise into a single comparable score.
+
+> **[REVISED 2026-07-06]** The final governance score uses the six WGI dimensions (as planned) but does NOT average them. `score_governance()` counts how many dimensions are below zero (`below_zero = sum(1 for v in india_scores_2023.values() if v < 0)`); the thresholds are 0–1 below zero → Favorable, 4+ → Lean-Negative. Transparency International CPI was not used — WGI only, no CPI in the data or code.
 
 ---
 
@@ -44,12 +48,16 @@ Tracks key analytical and methodological choices made during the research proces
 | Adverse | -35% | -0.2 SD |
 | Severe | -50% | -0.5 SD |
 
+> **[SUPERSEDED 2026-07-15]** The three-scenario Base/Adverse/Severe design was not built. Sensitivity is instead handled interactively via the Threshold Explorer (slider controls over the pre-declared thresholds), and macro risk is scored by `score_external_macro(inr_dep_pct, oil_share_pct)` with mild/severe thresholds. INR is scored as an annual depreciation rate, not a 10-year cumulative figure, and governance scoring uses a count of WGI dimensions below zero, not standard-deviation shifts. See the Threshold Explorer entry [2026-07-15].
+
 ---
 
 ### [2026-06-10] Digital Infrastructure Proxy
 **Decision**: Use UPI monthly transaction volume (value, not count) as a supporting structural narrative indicator, not as a direct input to regression/correlation analysis.
 **Rationale**: UPI volume is useful for the structural story around digital infrastructure adoption, but using it directly to predict returns risks spurious correlation.
 **Alternatives considered**: Internet penetration rate; retained as a secondary structural indicator but not the headline metric.
+
+> **[SUPERSEDED 2026-07-06]** UPI transaction volume and internet-penetration rate were replaced by World Bank Findex digital-payment adoption as the scored metric. `score_digital_adoption()` uses Findex `g20.any` (any digital payment, India 48% vs peer median 71%) and `merchant.pay`, both from Findex 2024. UPI/internet lacked comparable, updatable cross-country data suitable for a pre-declared threshold; Findex provided it. No UPI or internet-penetration data appears in the JSON or code.
 
 ---
 
