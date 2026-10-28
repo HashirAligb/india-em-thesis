@@ -1374,8 +1374,6 @@ elif section == "What Moves the Verdict?":
 
     st.divider()
     st.caption(
-        "All quantitative claims in this section derive from "
-        "src/assumption_audit.py using pre-declared defaults and pinned data. "
-        "The LLM pipeline (src/verdict_agents.py) uses Google Gemini; "
-        "key loaded from .env. Narrative does not affect the scored verdict."
+        "All figures come from the deterministic scoring model. "
+        "The AI narrative only explains these results and does not affect the verdict."
     )
