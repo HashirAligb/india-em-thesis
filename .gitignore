@@ -35,6 +35,7 @@ ENV/
 .env.local
 *.env
 secrets.json
+.streamlit/secrets.toml
 config/local_*.py
 
 # Data — raw source files are not committed (too large; reproduce via ingestion scripts)
