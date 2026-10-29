@@ -1,15 +1,16 @@
 """
-Assumption Auditor for the Layer 2 Forward Framework.
+Assumption Auditor: works out what it would take to move the Layer 2 verdict.
 
-Pure Python compute layer -- no display logic, no LLM calls.
+Pipeline: data_engine -> layer2 -> assumption_audit -> verdict_agents -> app.
+Pure Python compute layer, with no display logic and no LLM calls.
 Imports scoring functions from src.layer2 only; never reimplements them.
 
 Public API:
     run_assumption_audit(data, thresholds) -> AuditResult
 
-AuditResult is a typed dict consumed by both the agent pipeline and the
-Streamlit section.  The LLM seam is explicit: agents receive AuditResult
-and return plain text.  Nothing in this module calls an LLM.
+AuditResult is consumed by verdict_agents.py (which explains it) and by the
+"What Moves the Verdict?" section of app.py (which displays it). Agents
+receive AuditResult and return plain text; nothing here calls an LLM.
 """
 
 from __future__ import annotations
@@ -69,8 +70,8 @@ class AuditResult(TypedDict):
     nearest_downgrade: DowngradeScenario
     profile_stability: ProfileStability
     indicator_scores: dict[str, str]
-    # LLM seam: reasoning_notes is populated by Python for agents to explain.
-    # Agents must not add numbers or blockers not already in this list.
+    # Plain-English summary of the audit, written by Python. Printed by the CLI
+    # smoke test below; the agents build their prompts from the fields above.
     reasoning_notes: list[str]
 
 
@@ -81,14 +82,9 @@ class AuditResult(TypedDict):
 def _build_val_bands(caution_pct: int | float,
                      atrisk_pct: int | float,
                      severe_pct: int | float) -> list:
-    """
-    Build the valuation band list used by score_valuation().
-    Mirrors the logic in app.py to keep in sync.
-    The max() constraints ensure each band is at least 5pp wide:
-      a >= c + 0.05, s >= a + 0.05.
-    This means val_severe cannot be moved independently below (val_atrisk+5pp),
-    which is why sweeping val_severe alone cannot trip the gate at current premium.
-    """
+    """Three slider percentages in, the five valuation bands score_valuation() expects out.
+    Each band is forced to be at least 5pp wide, so severe always opens 5pp+ above at-risk.
+    Used by _score_all() and _nearest_downgrade(); app.py keeps a matching copy for its sliders."""
     c = caution_pct / 100
     a = max(atrisk_pct / 100, c + 0.05)
     s = max(severe_pct / 100, a + 0.05)
@@ -103,6 +99,9 @@ def _build_val_bands(caution_pct: int | float,
 
 def _score_all(thresholds: dict, india_wgi_2023: dict,
                india_any_pct: float, peer_any_pct: float) -> dict:
+    """Thresholds plus India's data in, all five indicator scores out.
+    One place to score everything, so every audit scenario is scored the same way.
+    Called by run_assumption_audit(), _nearest_downgrade() and _profile_stability()."""
     val_bands = _build_val_bands(
         thresholds["th_val_caution"],
         thresholds["th_val_atrisk"],
@@ -141,6 +140,9 @@ def _score_all(thresholds: dict, india_wgi_2023: dict,
 
 
 def _governance_blocker(india_wgi_2023: dict) -> UpgradeBlocker:
+    """India's 2023 WGI scores in, an explanation of why governance can't reach favorable out.
+    The favorable cutoff (at most one dimension below zero) is fixed, so no slider can fix it.
+    Called by run_assumption_audit(); the result lands in upgrade_blockers."""
     below_zero = [k for k, v in india_wgi_2023.items() if v < 0]
     count = len(below_zero)
     return UpgradeBlocker(
@@ -162,6 +164,9 @@ def _governance_blocker(india_wgi_2023: dict) -> UpgradeBlocker:
 
 
 def _digital_blocker(india_any: float, peer_any: float) -> UpgradeBlocker:
+    """India's and the peer median's digital payment rates in, the digital adoption blocker out.
+    Favorable needs India at or above the peer median; only new data can change that, not a slider.
+    Called by run_assumption_audit(); the result lands in upgrade_blockers."""
     gap = peer_any - india_any
     return UpgradeBlocker(
         indicator="digital_adoption",
@@ -184,19 +189,9 @@ def _digital_blocker(india_any: float, peer_any: float) -> UpgradeBlocker:
 
 def _nearest_downgrade(thresholds: dict, india_wgi_2023: dict,
                         india_any: float, peer_any: float) -> DowngradeScenario:
-    """
-    Report the nearest deterministic downgrade boundary.
-
-    The valuation severe gate is declared in the JSON premium_bands at range_low=0.40.
-    At the current premium (23.9%), the gap to that gate is 16.1pp.
-
-    Threshold-sweeping note: due to the max() band constraint in _build_val_bands,
-    val_severe cannot be independently lowered below (val_atrisk + 5pp).
-    With default val_atrisk=30%, the minimum achievable severe band open is 35%.
-    So no single-slider adjustment trips this gate at the current premium level.
-    The 16.1pp gap is therefore a data milestone (how much the premium itself would
-    need to increase given the declared bands), not a sweepable threshold.
-    """
+    """Thresholds and data in, the closest boundary that would drop the verdict to Rung 4 out.
+    It runs the real scoring at a 40% premium to prove the gate trips there, instead of assuming it.
+    Called by run_assumption_audit(); shown in app.py and quoted to the LLM agents."""
     current_pct = thresholds["premium"] * 100    # 23.9
 
     # The declared severe band opens at 40.0% (from the JSON premium_bands).
@@ -244,10 +239,9 @@ def _nearest_downgrade(thresholds: dict, india_wgi_2023: dict,
 
 def _profile_stability(thresholds: dict, india_wgi_2023: dict,
                         india_any: float, peer_any: float) -> ProfileStability:
-    """
-    Three illustrative mandate profiles -- threshold overrides only.
-    Demonstrates that Rung 3 holds across reasonable declared assumptions.
-    """
+    """Thresholds and data in, the rungs from three sample investor profiles out.
+    Shows Rung 3 holds under reasonable alternative thresholds, not just the defaults.
+    Called by run_assumption_audit(); its note is shown in app.py and sent to the agents."""
     profiles = {
         "Research Baseline": thresholds,
         "Long-Horizon Structural": dict(
@@ -280,10 +274,9 @@ def _profile_stability(thresholds: dict, india_wgi_2023: dict,
 
 
 def _build_reasoning_notes(result_partial: dict) -> list[str]:
-    """
-    Deterministic plain-English notes for agents to explain.
-    Agents must not add numbers or claims not listed here.
-    """
+    """The partial audit result in, a list of plain-English summary sentences out.
+    Python writes every claim here, so the summary never depends on the LLM.
+    Called by run_assumption_audit(); printed by the CLI smoke test at the bottom of this file."""
     d = result_partial["nearest_downgrade"]
     blockers = result_partial["upgrade_blockers"]
     ps = result_partial["profile_stability"]
@@ -330,14 +323,9 @@ def _build_reasoning_notes(result_partial: dict) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def run_assumption_audit(data: dict, thresholds: dict) -> AuditResult:
-    """
-    Run the full assumption audit.
-
-    data:       output of load_indicators() from src.layer2
-    thresholds: dict with both data values and threshold params (see _FULL_DEFAULTS)
-
-    Returns AuditResult.  Python computes everything; agents only explain it.
-    """
+    """Pinned indicators dict and a thresholds dict (see _FULL_DEFAULTS) in, the full AuditResult out.
+    Python computes every number here so the LLM agents only ever explain them.
+    Called by app.py ("What Moves the Verdict?"); verdict_agents.run_pipeline() explains the result."""
     gov_ind = get_indicator(data, "governance")
     dig_ind = get_indicator(data, "digital_adoption")
 

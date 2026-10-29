@@ -1,3 +1,12 @@
+"""
+Layer 1 data engine: pulls ETF prices and computes the historical scorecard.
+
+Pipeline: data_engine -> layer2 -> assumption_audit -> verdict_agents -> app.
+This is the historical (Layer 1) step. It runs offline from
+src/bronze/analysis.py, which saves the charts in outputs/figures/. The app
+does not call it live; it reads pinned Layer 1 results from data/ instead.
+"""
+
 import yfinance as yf
 import pandas as pd
 
@@ -6,10 +15,10 @@ import pandas as pd
 USE_REAL_DATA = True
 
 # The four instruments we are comparing:
-#   INDA  — iShares MSCI India ETF (our India proxy, USD-denominated)
-#   EEM   — iShares MSCI Emerging Markets ETF (broad EM benchmark)
-#   FXI   — iShares China Large-Cap ETF (China benchmark)
-#   INR=X — USD/INR spot rate (pulled for reference; useful later for currency work)
+#   INDA  : iShares MSCI India ETF (our India proxy, USD-denominated)
+#   EEM   : iShares MSCI Emerging Markets ETF (broad EM benchmark)
+#   FXI   : iShares China Large-Cap ETF (China benchmark)
+#   INR=X : USD/INR spot rate (not an investment; used for the rupee correlation)
 TICKERS = ["INDA", "EEM", "FXI", "INR=X"]
 
 # Start of the analysis window. 2013 is chosen because it post-dates the taper
@@ -20,14 +29,17 @@ END_DATE   = "2026-06-26"
 
 
 def load_data() -> pd.DataFrame:
+    """Download adjusted daily closes for the four tickers and return one price table.
+    The date window is pinned so every rerun reproduces the same numbers.
+    First call in src/bronze/analysis.py; every other function here starts from its output."""
     # Pull daily adjusted closing prices for all four tickers from Yahoo Finance.
     # auto_adjust=True tells yfinance to return prices already adjusted for
     # dividends and splits, so a dividend payout doesn't look like a price drop.
     # This matters here because INDA, EEM, and FXI pay different dividend amounts,
     # and comparing raw close prices would systematically undercount total return.
 
-    # Set the end date to today so the window always runs to the most recent
-    # available trading day.
+    # Use the pinned END_DATE (not today) so the window, and every number
+    # built on it, stays fixed between runs.
     end_date = END_DATE
 
     # Download all four tickers in a single API call. yfinance returns a
@@ -47,7 +59,7 @@ def load_data() -> pd.DataFrame:
 
     # Drop any rows where every column is NaN. These are typically non-trading
     # days (weekends, holidays) that slipped in. We use "all" so a row is only
-    # dropped if every ticker is missing — a row where just one ticker has a gap
+    # dropped if every ticker is missing; a row where just one ticker has a gap
     # is kept, because the others still have valid data.
     prices = prices.dropna(how="all")
 
@@ -61,6 +73,9 @@ def load_data() -> pd.DataFrame:
 
 
 def compute_returns(prices: pd.DataFrame) -> dict:
+    """Turn prices into daily returns and a growth-of-100 index, including EM ex-India.
+    Indexing to 100 lets ETFs with very different prices share one chart.
+    Called by src/bronze/analysis.py for the cumulative chart and the EM ex-India series."""
     # Build daily percentage returns and a cumulative index (starts at 100)
     # for each ticker so we can compare growth of $100 invested on day one.
 
@@ -74,7 +89,7 @@ def compute_returns(prices: pd.DataFrame) -> dict:
     # in load_data() the row survives because not ALL columns are NaN.
     # pct_change() then returns NaN for the ETFs on day 2 (can't compute a
     # return if day-1 price is NaN). We fix this by dropping any row where
-    # ALL ETF columns are NaN before computing returns — INR=X is only a
+    # ALL ETF columns are NaN before computing returns. INR=X is only a
     # supporting series and its holiday quirks shouldn't distort the returns.
     etf_cols = [t for t in prices.columns if t != "INR=X"]
     prices_clean = prices.dropna(subset=etf_cols, how="all")
@@ -83,7 +98,7 @@ def compute_returns(prices: pd.DataFrame) -> dict:
 
     # Cumulative index: (1 + daily_return).cumprod() gives the growth factor
     # since day one. Multiplying by 100 indexes everything to 100 at the start,
-    # so the chart reads "INDA grew from 100 to X" — easy to compare across ETFs
+    # so the chart reads "INDA grew from 100 to X", easy to compare across ETFs
     # even though their absolute prices differ.
     cumulative = (1 + daily_returns).cumprod() * 100
 
@@ -97,8 +112,11 @@ def compute_returns(prices: pd.DataFrame) -> dict:
 def compute_em_ex_india(returns_eem: pd.Series,
                         returns_inda: pd.Series,
                         india_weight: float = 0.15) -> pd.Series:
+    """Strip India out of EEM's daily returns to get an EM ex-India return series.
+    India is about 15% of EEM, so raw EEM would partly compare India with itself.
+    Called by compute_returns()."""
     # india_weight is a fixed-weight approximation. India's actual weight in EEM
-    # has ranged ~13–15% over 2013–present and shifts quarterly; a single constant
+    # has ranged ~13-15% from 2013 to now and shifts quarterly; a single constant
     # is a simplification, not a live calculation.
     #
     # The formula re-scales the residual basket back to 100% weight:
@@ -108,14 +126,17 @@ def compute_em_ex_india(returns_eem: pd.Series,
 
 
 def compute_risk_metrics(prices: pd.DataFrame) -> pd.DataFrame:
+    """Prices in, one row per ETF out with return, CAGR, volatility, drawdown and Sharpe.
+    These are the return and risk numbers the Layer 1 verdict is judged on.
+    Its table goes to compute_verdict() and the scorecard in src/bronze/analysis.py."""
     # For each ETF compute four metrics used in the verdict:
-    #   CAGR                — compound annual growth rate in USD terms
-    #   Annualized Vol      — how bumpy the ride was
-    #   Max Drawdown        — worst peak-to-trough loss over the full window
-    #   Sharpe-style Ratio  — return per unit of risk (0% risk-free rate)
+    #   CAGR                : compound annual growth rate in USD terms
+    #   Annualized Vol      : how bumpy the ride was
+    #   Max Drawdown        : worst peak-to-trough loss over the full window
+    #   Sharpe-style Ratio  : return per unit of risk (0% risk-free rate)
     #
     # We exclude INR=X from the metrics table because it is a currency rate,
-    # not an investable asset — including it in a return/risk table would be
+    # not an investable asset; including it in a return/risk table would be
     # misleading. It is kept in prices for the correlation analysis.
 
     etf_cols = [t for t in prices.columns if t != "INR=X"]
@@ -151,7 +172,7 @@ def compute_risk_metrics(prices: pd.DataFrame) -> pd.DataFrame:
 
         # Sharpe-style ratio: annualised return divided by annualised volatility.
         # Risk-free rate is set to 0% for simplicity and because we are comparing
-        # across a single consistent window — the decision log documents this.
+        # across a single consistent window. The decision log documents this.
         sharpe = cagr / ann_vol if ann_vol != 0 else float("nan")
 
         rows.append({
@@ -172,9 +193,12 @@ def compute_risk_metrics(prices: pd.DataFrame) -> pd.DataFrame:
 
 
 def run_correlation_analysis(prices: pd.DataFrame) -> dict:
+    """Prices in, rolling one-year correlations of INDA with EM and with the rupee out.
+    A rolling view shows whether those links held steady or shifted over time.
+    Feeds the rolling correlation chart in src/bronze/analysis.py."""
     # Compute rolling 12-month (252-trading-day) correlations:
-    #   INDA vs EEM   — how closely India tracks broad EM
-    #   INDA vs INR=X — how much of India's USD return is driven by the rupee
+    #   INDA vs EEM   : how closely India tracks broad EM
+    #   INDA vs INR=X : how much of India's USD return is driven by the rupee
     #
     # Rolling correlation rather than a single number is more honest: it shows
     # whether the relationship has been stable or whether it changed over time
@@ -226,18 +250,22 @@ def run_correlation_analysis(prices: pd.DataFrame) -> dict:
 
 
 def compute_verdict(metrics: pd.DataFrame) -> str:
+    """Risk metrics table in, the Layer 1 verdict string out.
+    Applies a rule fixed in advance, so the answer isn't picked after seeing the numbers.
+    Last step in src/bronze/analysis.py; the verdict card and report show its result."""
     # Pre-declared verdict rule:
-    #   SUPPORTED          — INDA beats both EM ex-India and FXI on cumulative
-    #                        return AND on the Sharpe-style ratio.
-    #   PARTIALLY SUPPORTED — INDA beats both benchmarks on exactly one of the
-    #                        two measures (return or Sharpe, not both).
-    #   NOT SUPPORTED      — INDA fails to beat both benchmarks on either measure.
+    #   SUPPORTED           : INDA beats both EM ex-India and FXI on cumulative
+    #                         return AND on the Sharpe-style ratio.
+    #   PARTIALLY SUPPORTED : INDA beats both benchmarks on exactly one of the
+    #                         two measures (return or Sharpe, not both).
+    #   NOT SUPPORTED       : INDA fails to beat both benchmarks on either measure.
     #
     # EEM (raw) is intentionally excluded: India is ~15% of EEM, so comparing
     # against it would partly compare India against itself. EM ex-India is the
     # only EM benchmark in the verdict.
 
     def get(ticker, col):
+        """Look up one raw value for a ticker in the metrics table."""
         row = metrics[metrics["Ticker"] == ticker]
         return row[col].values[0]
 

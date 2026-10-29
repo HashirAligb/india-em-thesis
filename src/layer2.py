@@ -1,8 +1,11 @@
 """
-Layer 2 compute module.
+Layer 2 scoring module: the five forward-looking indicator scores and the ladder.
 
-Reads data/layer2_indicators.json and exposes clean Python objects
-for the Streamlit app. Holds no display logic.
+Pipeline: data_engine -> layer2 -> assumption_audit -> verdict_agents -> app.
+Reads data/layer2_indicators.json, scores five indicators, and turns those
+scores into a Rung 1-4 verdict. It does not use data_engine's output; Layer 1
+and Layer 2 only meet in app.py. Called by app.py (Part 2) and by
+assumption_audit.py. Holds no display logic.
 """
 
 import json
@@ -16,24 +19,35 @@ _INDICATORS_PATH = os.path.join(_DATA_DIR, "layer2_indicators.json")
 # ── Data loaders ──────────────────────────────────────────────────────────────
 
 def load_indicators() -> dict:
+    """Read data/layer2_indicators.json and return it as a dict.
+    All Layer 2 inputs live in one pinned file so the verdict can be reproduced exactly.
+    Called by app.py and by score_* defaults; most functions here take its output."""
     with open(_INDICATORS_PATH, "r") as f:
         return json.load(f)
 
 
 def get_metadata(data: dict) -> dict:
+    """Return the "metadata" block (description, data note, created date).
+    Not called anywhere in the app or tests today."""
     return data["metadata"]
 
 
 def get_indicator(data: dict, key: str) -> dict:
+    """Return one indicator's block, such as "governance", from the indicators dict.
+    Keeps knowledge of the JSON layout here instead of spread across callers.
+    Used by app.py, assumption_audit.py and the functions below."""
     return data["indicators"][key]
 
 
 def get_ladder_verdict(data: dict) -> dict:
+    """Return the pinned ladder verdict block (the declared verdict and its wording).
+    Called by app.py (Part 2) to show the declared verdict, and by scoring_summary()."""
     return data["ladder_verdict"]
 
 
 def governance_as_dataframe(data: dict) -> pd.DataFrame:
-    """Return the WGI table as a DataFrame indexed by dimension."""
+    """Return the WGI table as a DataFrame, one row per dimension, India and China by year.
+    Called by app.py (Part 2) to show the governance table when live WGI data isn't loaded."""
     ind = get_indicator(data, "governance")
     table = ind["wgi_table"]
     years = table["years"]
@@ -50,7 +64,8 @@ def governance_as_dataframe(data: dict) -> pd.DataFrame:
 
 
 def digital_peer_table(data: dict) -> pd.DataFrame:
-    """Return the Findex 2024 cross-country table as a DataFrame."""
+    """Return the Findex 2024 cross-country table as a DataFrame indexed by country.
+    Called by app.py (Part 2) to show the peer table when live Findex data isn't loaded."""
     ind = get_indicator(data, "digital_adoption")
     rows = ind["peer_table_2024"]
     df = pd.DataFrame(rows)
@@ -59,6 +74,8 @@ def digital_peer_table(data: dict) -> pd.DataFrame:
 
 
 def scoring_summary(data: dict) -> pd.DataFrame:
+    """Return the pinned scoring summary rows as a DataFrame.
+    Not called anywhere in the app or tests today."""
     rows = get_ladder_verdict(data)["scoring_summary"]
     return pd.DataFrame(rows)
 
@@ -104,15 +121,9 @@ _VALUATION_BAND_TO_SCORE: dict[str, tuple[str, bool]] = {
 
 
 def score_valuation(premium: float = 0.239, bands: list | None = None) -> dict:
-    """
-    Score India's P/E premium to EM ex-India against the pre-declared bands.
-
-    premium: fractional premium, e.g. 0.239 = 23.9%. Default is the mid-point of
-             the locked range (w=13%).
-    bands:   list of {label, range_low, range_high} dicts. Loaded from JSON if None.
-
-    Returns {"score": str, "score_display": str, "gate_trips_severe": bool}.
-    """
+    """India's P/E premium to EM ex-India (a fraction, 0.239 = 23.9%) in, valuation score out.
+    Valuation is a gate: a premium in the severe band forces Rung 4 on its own.
+    Called by app.py with the slider bands, by assumption_audit.py, and by the tests."""
     if bands is None:
         bands = get_indicator(load_indicators(), "valuation")["premium_bands"]
 
@@ -133,17 +144,9 @@ def score_demographics(
     female_lfp_pct: float = 35.0,
     max_ratio_for_favorable: float = 0.60,
 ) -> dict:
-    """
-    Score India's demographic position relative to China.
-
-    Favorable if India's old-age dependency ratio < max_ratio_for_favorable * China's.
-    Default threshold 0.60: India (10) vs China (21) gives ratio 0.48, comfortably favorable.
-
-    Female LFP is returned as a conversion_caveat flag (True when < 45%), not a
-    score modifier.
-
-    Returns {"score": str, "score_display": str, "conversion_caveat": bool}.
-    """
+    """India vs China old-age dependency ratios in, demographics score out.
+    Favorable if India is under 60% of China's ratio; low female work rates only add a caveat.
+    Called by app.py with the slider value, by assumption_audit.py, and by the tests."""
     ratio = old_age_dep_india / old_age_dep_china if old_age_dep_china > 0 else 1.0
     key = "favorable" if ratio < max_ratio_for_favorable else "neutral"
     return {
@@ -157,21 +160,9 @@ def score_governance(
     india_scores_2023: dict | None = None,
     neutral_neg_threshold: int = 4,
 ) -> dict:
-    """
-    Score India's WGI governance profile (six dimensions, 2023).
-
-    Counts how many of the six WGI dimensions have India below zero (below the
-    global mean). Pre-declared thresholds:
-      0-1 below zero               -> favorable
-      2 to (threshold - 1)         -> neutral
-      threshold (4) to 6           -> neutral_lean_negative
-
-    india_scores_2023: {dimension_name: float} for India 2023. Loaded from JSON if None.
-    neutral_neg_threshold: minimum count of below-zero dimensions to score
-                           neutral_lean_negative (default 4).
-
-    Returns {"score": str, "score_display": str, "below_zero_count": int}.
-    """
+    """India's six 2023 WGI governance scores in, governance score out.
+    Counts dimensions below the world average (zero): 0-1 favorable, 2-3 neutral, 4+ lean-negative.
+    Called by app.py with the slider value, by assumption_audit.py, and by the tests."""
     if india_scores_2023 is None:
         data = load_indicators()
         gov_ind = get_indicator(data, "governance")
@@ -202,17 +193,9 @@ def score_digital_adoption(
     trend_direction: str = "up",
     large_gap: float = 20.0,
 ) -> dict:
-    """
-    Score India's digital financial adoption vs the EM peer median.
-
-    india_pct >= peer_median_pct              -> favorable (India leads)
-    india_pct < peer_median_pct - large_gap:
-      trend "up"                              -> neutral (convergence from behind)
-      trend "flat" or "down"                  -> at_risk_mild
-    india within large_gap of peers           -> neutral (approaching peers)
-
-    Returns {"score": str, "score_display": str, "gap_pp": float}.
-    """
+    """India's digital payment rate vs the EM peer median in, digital adoption score out.
+    Favorable only if India matches the peers; a big gap is neutral if trending up, at-risk if not.
+    Called by app.py with the slider value, by assumption_audit.py, and by the tests."""
     gap = peer_median_pct - india_pct
 
     if india_pct >= peer_median_pct:
@@ -240,21 +223,9 @@ def score_external_macro(
     inr_severe_threshold: float = 8.0,
     oil_severe_threshold: float = 45.0,
 ) -> dict:
-    """
-    Score India's combined external macro vulnerability (INR drag + oil exposure).
-
-    Currency drag and oil exposure are one indicator because oil shocks drive
-    rupee pressure; separating them would double-count the same underlying risk.
-
-    Severe gate trips if:  inr_dep >= inr_severe_threshold OR oil >= oil_severe_threshold
-    At-risk (mild) if:     either mild threshold is crossed without hitting severe
-    Neutral otherwise.
-
-    Defaults reflect the locked mid-2026 values: INR ~3.5%/yr (midpoint of 3-4%),
-    oil share ~25% of imports.
-
-    Returns {"score": str, "score_display": str, "gate_trips_severe": bool}.
-    """
+    """Rupee depreciation and oil import share in, external macro score and severe-gate flag out.
+    One indicator, not two, because oil shocks drive rupee weakness; splitting would count it twice.
+    Called by app.py with the slider values, by assumption_audit.py, and by the tests."""
     if (inr_dep_pct >= inr_severe_threshold) or (oil_share_pct >= oil_severe_threshold):
         return {
             "score": "severe",
@@ -286,23 +257,23 @@ _DISPLAY_NAMES = {
 
 
 def compute_ladder_verdict(scores: dict) -> dict:
-    """
-    Apply the pre-declared confidence ladder rule to five scored indicators.
+    """Five indicator scores in, a Rung 1-4 verdict with a plain-English derivation out.
+    Rule fixed before scoring: a severe gate forces Rung 4; any non-favorable structural score means Rung 3.
+    Final step for app.py (Part 2) and assumption_audit.py; the tests lock its default result."""
+    # Pre-declared rule (set before scoring began):
+    #   1. Any gating indicator gate_trips_severe=True  -> Rung 4 (hard cap).
+    #   2. No severe gate, structural support incomplete
+    #      (at least one structural indicator != "favorable") -> Rung 3.
+    #   3. No severe gate, all structural favorable:
+    #      - valuation in {"favorable", "neutral"} -> Rung 1.
+    #      - valuation is "neutral_to_caution" or worse -> Rung 2.
+    #
+    # scores: dict keyed by indicator name; each value is the dict returned by the
+    #         corresponding score_* function. Gating entries must include
+    #         "gate_trips_severe".
+    #
+    # Returns {"rung": int, "label": str, "derivation": str}.
 
-    Pre-declared rule (set before scoring began):
-      1. Any gating indicator gate_trips_severe=True  -> Rung 4 (hard cap).
-      2. No severe gate, structural support incomplete
-         (at least one structural indicator != "favorable") -> Rung 3.
-      3. No severe gate, all structural favorable:
-         - valuation in {"favorable", "neutral"} -> Rung 1.
-         - valuation is "neutral_to_caution" or worse -> Rung 2.
-
-    scores: dict keyed by indicator name; each value is the dict returned by the
-            corresponding score_* function. Gating entries must include
-            "gate_trips_severe".
-
-    Returns {"rung": int, "label": str, "derivation": str}.
-    """
     # Step 1: severe gate check
     any_severe = any(
         scores.get(k, {}).get("gate_trips_severe", False)
@@ -360,16 +331,9 @@ def compute_ladder_verdict(scores: dict) -> dict:
 # ── Default verification ──────────────────────────────────────────────────────
 
 def _verify_defaults() -> None:
-    """
-    Call every score_* function with no arguments (defaults) and assert the
-    results match the locked mid-2026 verdict exactly.
-
-    Expected: valuation=neutral_to_caution, demographics=favorable,
-              governance=neutral_lean_negative, digital_adoption=neutral,
-              external_macro=at_risk_mild, rung=3.
-
-    Raises AssertionError on any divergence.
-    """
+    """Run every score_* function on its defaults and assert they reproduce the locked Rung 3.
+    A quick guard that the pinned defaults still match the published verdict.
+    Runs when you call python src/layer2.py directly; tests/test_layer2.py covers the same ground."""
     print("Verifying that defaults reproduce the locked Rung 3 verdict...\n")
 
     val = score_valuation()

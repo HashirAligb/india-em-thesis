@@ -1,6 +1,11 @@
 """
 World Bank API refresh functions.
 
+Pipeline: data_engine -> layer2 -> assumption_audit -> verdict_agents -> app.
+Optional side input to the Layer 2 step: the Part 2 refresh buttons in app.py
+call these to swap pinned WGI and Findex data for live values. The declared
+verdict and the Assumption Auditor always use the pinned data.
+
 Pulls live WGI and Findex data and returns dicts in the same shape
 that app.py and the scoring functions consume.
 
@@ -59,11 +64,9 @@ _FINDEX_ISO3_TO_NAME    = {
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 def _get(url: str) -> list:
-    """Fetch a World Bank v2 endpoint and return the data list (raw[1]).
-
-    Raises ValueError or urllib.error.URLError on any problem so the caller
-    can wrap in a single try/except.
-    """
+    """Fetch one World Bank API URL and return its data rows (the second item of the reply).
+    Raises on any problem so each fetch_* function needs only one try/except.
+    Called by fetch_wgi() and fetch_findex()."""
     req = urllib.request.Request(url, headers=_HEADERS)
     with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
         raw = json.loads(resp.read().decode())
@@ -78,21 +81,9 @@ def _get(url: str) -> list:
 # ── Public refresh functions ──────────────────────────────────────────────────
 
 def fetch_wgi() -> Optional[dict]:
-    """Pull live WGI governance estimates for India and China.
-
-    Makes 6 sequential API calls (one per WGI dimension).
-
-    Returns a dict:
-        dimensions  - list with the same shape as wgi_table.dimensions
-                      in layer2_indicators.json; each item has:
-                          "name":  str (dimension name)
-                          "india": {"2014": float, "2019": float, "2023": float}
-                          "china": {"2014": float, "2019": float, "2023": float}
-        fetched_at  - ISO-8601 UTC timestamp string
-        latest_year - int (most recent year returned by the API)
-
-    Returns None on any network or parse failure.
-    """
+    """Live WGI scores for India and China (2014, 2019, 2023), shaped like the pinned JSON table.
+    Matching the pinned shape means scoring can't tell live from pinned; returns None on any failure.
+    Called by the WGI refresh button in app.py (Part 2) via _do_refresh_wgi()."""
     try:
         dimensions = []
         for code, dim_name in _WGI_CODES:
@@ -136,24 +127,12 @@ def fetch_wgi() -> Optional[dict]:
 
 
 def fetch_findex() -> Optional[dict]:
-    """Pull live Findex digital-payment data for India and EM peers.
-
-    Makes 2 API calls (one per indicator).
-
-    Returns a dict:
-        india_any               - float (% age 15+ who made/received any digital payment)
-        peer_median_any         - float (median across the 9 EM peers, excl. India)
-        india_merchant          - float (% age 15+ who made a digital merchant payment)
-        peer_median_merchant    - float
-        peer_table              - list of {"country": str, "any_pct": float, "merchant_pct": float}
-                                  sorted by country name; includes India and all 9 peers
-        data_year               - int (survey year returned by the API)
-        fetched_at              - ISO-8601 UTC timestamp string
-
-    Returns None on any network or parse failure.
-    """
+    """Live Findex digital payment rates for India and nine EM peers, plus the peer medians.
+    Shaped like the pinned peer table; returns None on any failure so the page falls back to pinned.
+    Called by the Findex refresh button in app.py (Part 2) via _do_refresh_findex()."""
     try:
         def _findex_url(indicator: str) -> str:
+            """Build the Findex API URL for one indicator code."""
             return (
                 f"{_BASE}/country/{_FINDEX_COUNTRY_PARAM}/indicator/{indicator}"
                 f"?source={_FINDEX_SOURCE}&format=json&per_page=20&mrv=1"
@@ -214,4 +193,5 @@ def fetch_findex() -> Optional[dict]:
 # ── Utility ───────────────────────────────────────────────────────────────────
 
 def _utc_now() -> str:
+    """Current UTC time as text like "2026-10-29T12:00:00Z", for the fetched_at stamp."""
     return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")

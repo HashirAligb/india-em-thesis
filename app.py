@@ -429,6 +429,8 @@ FXI: **{fxi['sharpe_style']:.3f}**.
 
 # ── Part 2 ────────────────────────────────────────────────────────────────────
 elif section == "Part 2: Forward Framework":
+    # Layer 2 scoring (src/layer2.py) plus the optional live World Bank data
+    # (src/wb_refresh.py). Imported here so other sections don't load them.
     from src.layer2 import (
         load_indicators, get_indicator, get_ladder_verdict,
         governance_as_dataframe, digital_peer_table,
@@ -477,6 +479,7 @@ elif section == "Part 2: Forward Framework":
             st.session_state[_k] = _v
 
     def _do_refresh_wgi() -> None:
+        # src/wb_refresh.py returns live WGI data, or None if the API fails.
         result = fetch_wgi()
         if result is not None:
             st.session_state["wgi_live"]  = result
@@ -488,6 +491,7 @@ elif section == "Part 2: Forward Framework":
             )
 
     def _do_refresh_findex() -> None:
+        # src/wb_refresh.py returns live Findex data, or None if the API fails.
         result = fetch_findex()
         if result is not None:
             st.session_state["findex_live"]  = result
@@ -584,6 +588,8 @@ elif section == "Part 2: Forward Framework":
             st.button("Revert to pinned data", on_click=_revert_to_pinned)
 
     # ── Load pinned data ──────────────────────────────────────────────────────
+    # src/layer2.py: read the pinned JSON, then pull out each indicator's block
+    # and the declared verdict.
     data    = load_indicators()
     val_ind = get_indicator(data, "valuation")
     dem_ind = get_indicator(data, "demographics")
@@ -644,6 +650,8 @@ elif section == "Part 2: Forward Framework":
         st.session_state["th_val_severe"],
     )
 
+    # Re-score all five indicators with the current slider values, using the
+    # same src/layer2.py score_* functions that produced the declared verdict.
     live_val = score_valuation(premium=_prem, bands=_live_bands)
     live_dem = score_demographics(
         old_age_dep_india=_dem_dp["old_age_dep_india"],
@@ -677,6 +685,7 @@ elif section == "Part 2: Forward Framework":
         "digital_adoption": live_dig,
         "external_macro":   live_ext,
     }
+    # Apply the pre-declared ladder rule (src/layer2.py) to the live scores.
     live_verdict = compute_ladder_verdict(live_scores)
 
     off_default = any(st.session_state.get(_k) != _v for _k, _v in _DEFAULTS.items())
@@ -846,6 +855,7 @@ elif section == "Part 2: Forward Framework":
             _wgi_rows.append(row)
         wgi_df = pd.DataFrame(_wgi_rows).set_index("Dimension")
     else:
+        # No live refresh: use the pinned WGI table from src/layer2.py.
         wgi_df = governance_as_dataframe(data)
 
     def color_wgi_cell(v):
@@ -934,6 +944,7 @@ elif section == "Part 2: Forward Framework":
                 for r in _fl["peer_table"]
             ]).set_index("Country")
         else:
+            # No live refresh: use the pinned Findex peer table from src/layer2.py.
             _ptable = digital_peer_table(data)
         st.dataframe(_ptable, use_container_width=True)
 
@@ -1174,6 +1185,8 @@ elif section == "Part 2: Forward Framework":
 
 elif section == "What Moves the Verdict?":
     import json as _json
+    # Auditor numbers come from src/assumption_audit.py (pure Python); the
+    # optional narrative comes from src/verdict_agents.py (Gemini).
     from src.assumption_audit import run_assumption_audit, _FULL_DEFAULTS
     from src.verdict_agents import run_pipeline
 
@@ -1184,6 +1197,8 @@ elif section == "What Moves the Verdict?":
     with open(_audit_data_path) as _f:
         _audit_raw = _json.load(_f)
 
+    # Always audits the pre-declared defaults and pinned data, not the Part 2
+    # slider positions, so this section explains the declared verdict.
     _audit = run_assumption_audit(_audit_raw, _FULL_DEFAULTS)
 
     d   = _audit["nearest_downgrade"]
@@ -1330,6 +1345,8 @@ elif section == "What Moves the Verdict?":
     if _run_btn:
         with st.spinner("Running agent pipeline..."):
             try:
+                # src/verdict_agents.py: Gemini explains the audit, Python fact-checks
+                # it. Any failure becomes an error message instead of a crash.
                 st.session_state["wmv_pipeline_outputs"] = run_pipeline(_audit)
             except Exception as _exc:
                 st.session_state["wmv_pipeline_outputs"] = {

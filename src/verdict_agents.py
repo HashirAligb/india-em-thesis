@@ -1,6 +1,11 @@
 """
 Agent pipeline for the Assumption Auditor section.
 
+Pipeline: data_engine -> layer2 -> assumption_audit -> verdict_agents -> app.
+Takes the AuditResult from assumption_audit.py, has Gemini explain it in plain
+English, then fact-checks that text in Python. app.py calls run_pipeline()
+when the user clicks "Generate narrative".
+
 Architecture: each agent is a plain function -- same signature, chained in a
 list so adding a third agent is one more list entry, not a rewrite.
 
@@ -8,8 +13,9 @@ list so adding a third agent is one more list entry, not a rewrite.
   Validator:        (audit_result, analysis_text) -> ValidationResult  [pure Python]
 
 LLM provider is isolated in _llm_call().  Swap the provider by editing only
-that function.  Current provider: Google Gemini via google-generativeai.
-API key loaded from GEMINI_API_KEY in .env -- never hardcoded.
+that function.  Current provider: Google Gemini via google-genai.
+API key read from the GEMINI_API_KEY environment variable (a local .env file,
+or Streamlit secrets when deployed). Never hardcoded.
 
 Rules that cannot break:
   - Python computes every number in AuditResult.  Agents only explain it.
@@ -51,12 +57,9 @@ class ValidationResult(TypedDict):
 # ---------------------------------------------------------------------------
 
 def _llm_call(system: str, user: str, max_tokens: int = 600) -> str:
-    """
-    Single call to the configured LLM provider.
-    Provider: Google Gemini (google-genai).
-    Key: GEMINI_API_KEY from environment / .env file.
-    To swap provider: replace this function body only.
-    """
+    """System and user prompts in, Gemini's reply text out.
+    The only code that knows the LLM provider, so swapping providers means editing just this.
+    Called by both agents; raises if GEMINI_API_KEY is missing, and run_pipeline() catches it."""
     from google import genai
     from google.genai import types
 
@@ -83,10 +86,9 @@ def _llm_call(system: str, user: str, max_tokens: int = 600) -> str:
 # ---------------------------------------------------------------------------
 
 def agent_analysis(audit: AuditResult, prior_text: str = "") -> str:
-    """
-    Explain the audit result in plain English for the thesis reader.
-    Must not invent numbers or claims absent from audit.
-    """
+    """Audit result in, a 3-4 paragraph plain-English explanation from Gemini out.
+    The prompt passes only Python-computed facts and forbids new numbers or forecasts.
+    First agent in run_pipeline(); its text is then fact-checked by validate_analysis()."""
     d = audit["nearest_downgrade"]
     blockers = audit["upgrade_blockers"]
     ps = audit["profile_stability"]
@@ -142,11 +144,9 @@ Framing requirements:
 # ---------------------------------------------------------------------------
 
 def validate_analysis(audit: AuditResult, analysis_text: str) -> ValidationResult:
-    """
-    Deterministic fact-check of the analysis text.
-    Checks correct rung, both blocker names, correct gap number.
-    Flags numbers not present in the audit result.
-    """
+    """Checks the agent's text names Rung 3 and both blockers, and flags numbers not in the audit.
+    Plain Python with no LLM, so the checker itself can't make things up.
+    Called by run_pipeline() right after agent_analysis(); app.py shows the pass/fail badge."""
     d = audit["nearest_downgrade"]
     text = analysis_text.lower()
     failures: list[str] = []
@@ -180,12 +180,9 @@ def validate_analysis(audit: AuditResult, analysis_text: str) -> ValidationResul
     }
 
     def _canon(s: str) -> str:
-        """Normalize a number string for comparison against the allowed set.
-
-        Handles two false-positive cases:
-        - "40.0" (LLM writes the trigger with one decimal) -> "40"
-        - "0.40" (LLM writes the premium as a fraction)    -> "40"
-        """
+        """Normalize a number string so "40.0" and "0.40" both match "40" in the allowed set.
+        Stops harmless formatting differences being flagged as invented numbers.
+        Used only inside validate_analysis()."""
         try:
             f = float(s)
             if 0 < f < 1:          # fraction -> percentage
@@ -222,12 +219,9 @@ def validate_analysis(audit: AuditResult, analysis_text: str) -> ValidationResul
 # ---------------------------------------------------------------------------
 
 def agent_overreach_check(audit: AuditResult, prior_text: str = "") -> str:
-    """
-    Flag soft overreach in prior_text: exaggeration, forecast-framing,
-    investment recommendations, unsupported causal claims, false certainty.
-    Does not recheck hard numbers (the validator handles those).
-    Returns "No overreach detected." or a bullet list.
-    """
+    """Analysis text in, "No overreach detected." or a bullet list of problems out.
+    Catches soft issues a Python check can't, like forecast-style wording or investment advice.
+    Second agent in run_pipeline(); it receives agent_analysis()'s text as prior_text."""
     if not prior_text.strip():
         return "No prior text to check."
 
@@ -267,11 +261,9 @@ If none found, respond with exactly: No overreach detected.
 # ---------------------------------------------------------------------------
 
 def run_pipeline(audit: AuditResult) -> dict:
-    """
-    Run the agent chain and return all outputs.
-    Chain is a list -- one more entry adds a third agent, nothing else changes.
-    Each stage result is available even if later stages fail.
-    """
+    """Audit result in, a dict with the analysis, its validation and the overreach check out.
+    Agents are a list, so adding one is one new entry; each failure is caught so the page still loads.
+    Called by app.py when the user clicks "Generate narrative"."""
     chain: list[tuple[str, AgentFn]] = [
         ("analysis",        agent_analysis),
         ("overreach_check", agent_overreach_check),
